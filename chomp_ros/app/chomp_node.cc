@@ -37,9 +37,11 @@ int main(int argc, char** argv) {
   constexpr float kOccupancyThreshold = -0.1f;
   constexpr float kRobotRadius = 1.f;
   constexpr float kChompRobotRadiusPadding = 0.5f;
+  // std::filesystem::path occupancy_file_path =
+  //     "/home/nicole/ros/git/wavemap/data/example_maps/newer_college_mine_5cm.wvmp";
   std::filesystem::path occupancy_file_path =
-      "/home/victor/data/wavemaps/newer_college_mine_5cm.wvmp";
-  std::filesystem::path logging_dir = "/home/victor/data/waverider/chomp_stats";
+      "/home/nicole/ros/git/wavemap/data/anymal/map_lab.wvmp";
+  std::filesystem::path logging_dir = "/home/nicole/data/waverider/chomp_stats";
 
   // Create the logging dir if needed
   std::filesystem::create_directories(logging_dir);
@@ -258,7 +260,7 @@ int main(int argc, char** argv) {
       break;
     } else {
       // Give us some time to look at the trajectory
-      ros::Duration(3).sleep();
+      ros::Duration(10).sleep();
     }
   }
 
