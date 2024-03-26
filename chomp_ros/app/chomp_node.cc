@@ -35,8 +35,8 @@ int main(int argc, char** argv) {
 
   // Settings
   constexpr float kOccupancyThreshold = -0.1f;
-  constexpr float kRobotRadius = 1.f;
-  constexpr float kChompRobotRadiusPadding = 0.5f;
+  constexpr float kRobotRadius = 0.5f;
+  constexpr float kChompRobotRadiusPadding = 0.3f;
   // std::filesystem::path occupancy_file_path =
   //     "/home/nicole/ros/git/wavemap/data/example_maps/newer_college_mine_5cm.wvmp";
   std::filesystem::path occupancy_file_path =
@@ -103,9 +103,12 @@ int main(int argc, char** argv) {
   esdf_pub.publish(msg);
 
   // Define the ESDF distance getter
-  auto distance_getter = [&occupancy_map,
-                          &esdf](const Eigen::Vector3d& position_d) {
-    const wavemap::Point3D position = position_d.cast<wavemap::FloatingPoint>();
+  constexpr double paddedRobotRadius = kRobotRadius + kChompRobotRadiusPadding;
+
+  auto distance_getter = [&occupancy_map, &esdf,
+                          &kChompRobotRadiusPadding](const Eigen::Vector2d& position_d) {
+    // const wavemap::Point3D position = position_d.cast<wavemap::FloatingPoint>();
+    const wavemap::Point3D position(position_d[0], position_d[1], paddedRobotRadius);
     if (wavemap::interpolateTrilinear(*occupancy_map, position) <
         kOccupancyThreshold) {
       return wavemap::interpolateTrilinear(*esdf, position);
@@ -122,8 +125,9 @@ int main(int argc, char** argv) {
   params.w_smooth = 0.1;
   params.lambda = 100;  // 20.1
   params.max_iter = 100;
-  params.epsilon = kRobotRadius + kChompRobotRadiusPadding;
+  params.epsilon = paddedRobotRadius;
   params.decrease_step_size = true;
+  params.D = 2; // dimensionalilty state (here: only x and y position)
   chomp.setParameters(params);
   chomp.setDistanceFunction(distance_getter);
 
@@ -140,10 +144,10 @@ int main(int argc, char** argv) {
       }
 
       // Get random start and goal positions
-      const auto start = wavemap::getCollisionFreePosition(*occupancy_map,
-                                                           *esdf, kRobotRadius);
-      const auto goal = wavemap::getCollisionFreePosition(*occupancy_map, *esdf,
-                                                          kRobotRadius);
+      const auto start =
+          wavemap::getCollisionFree2DPosition(*occupancy_map, *esdf, kRobotRadius);
+      const auto goal =
+          wavemap::getCollisionFree2DPosition(*occupancy_map, *esdf, kRobotRadius);
       if (!start || !goal) {
         LOG(ERROR) << "Could not find collision free start and goal positions";
         return EXIT_FAILURE;
@@ -170,7 +174,7 @@ int main(int argc, char** argv) {
         marker.color.b = 1.0;
         marker.pose.position.x = start->x();
         marker.pose.position.y = start->y();
-        marker.pose.position.z = start->z();
+        marker.pose.position.z = params.epsilon;
         trajectory_pub.publish(marker);
         // Publish the goal position
         marker.ns = "goal";
@@ -178,7 +182,7 @@ int main(int argc, char** argv) {
         marker.color.g = 1.0;
         marker.pose.position.x = goal->x();
         marker.pose.position.y = goal->y();
-        marker.pose.position.z = goal->z();
+        marker.pose.position.z = params.epsilon;
         trajectory_pub.publish(marker);
       }
 
@@ -250,7 +254,7 @@ int main(int argc, char** argv) {
       auto& position_msg = trajectory_msg.points.emplace_back();
       position_msg.x = position.x();
       position_msg.y = position.y();
-      position_msg.z = position.z();
+      position_msg.z = params.epsilon;
     }
     trajectory_pub.publish(trajectory_msg);
 
