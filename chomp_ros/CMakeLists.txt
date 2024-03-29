@@ -14,6 +14,8 @@ cs_add_library(${PROJECT_NAME}
 # Binaries
 cs_add_executable(chomp_node app/chomp_node.cc)
 target_link_libraries(chomp_node ${PROJECT_NAME})
+cs_add_executable(chomp_planner src/chomp_planner.cc)
+target_link_libraries(chomp_planner ${PROJECT_NAME})
 
 # Export
 cs_install()
