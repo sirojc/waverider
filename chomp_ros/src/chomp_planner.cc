@@ -32,9 +32,7 @@ ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private) : nh_
   }
 
   // Generate the ESDF
-  constexpr float kOccupancyThreshold = -0.1f;
-  constexpr float kMaxDistance = 2.f;
-  esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold, kMaxDistance));
+  esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
 
   // Publish the ESDF
   wavemap_msgs::Map msg;
@@ -44,7 +42,7 @@ ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private) : nh_
   // Define the ESDF distance getter
   distance_getter_ = [this](const Eigen::Vector2d& position_d) {
     const wavemap::Point3D position(position_d[0], position_d[1], this->paddedRobotRadius_);
-    if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold) {
+    if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold_) {
         return wavemap::interpolateTrilinear(*this->esdf_, position);
     } else {
         return 0.f;
@@ -70,7 +68,7 @@ ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private) : nh_
 // todo: CHECK IF START IS PART OF TRAJECTORY OR NOT - HANDLE ACCORDINGLY
 // TODO: implement this better (include z, roll, pitch for start? To start from current configuration?)
 Eigen::MatrixXd ChompPlanner::get_full_traj(const Eigen::MatrixXd chomp_traj, const geometry_msgs::Pose start,
-                                            const geometry_msgs::Pose goal) {
+                                            const geometry_msgs::Pose goal) const {
   int n_elements = chomp_traj.rows();
 
   // x, y given through trajectory
@@ -234,6 +232,28 @@ bool ChompPlanner::getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
   }
 
   return true;
+}
+
+void ChompPlanner::updateMap(const wavemap::VolumetricDataStructureBase::Ptr map) {
+  // update and republish occupancy map
+  occupancy_map_ = map;
+  
+  wavemap_msgs::Map occupancy_map_msg;
+  wavemap::convert::mapToRosMsg(*occupancy_map_, "odom", ros::Time::now(), occupancy_map_msg);
+  occupancy_pub_.publish(occupancy_map_msg);
+
+  // update hashed map
+  hashed_map_ = std::dynamic_pointer_cast<wavemap::HashedWaveletOctree>(occupancy_map_);
+  if (!hashed_map_) {
+    ROS_ERROR("Failed to cast occupancy map to HashedWaveletOctree.");
+  }
+
+  // update and publish esdf
+  esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
+
+  wavemap_msgs::Map msg;
+  wavemap::convert::mapToRosMsg(*esdf_, "odom", ros::Time::now(), msg);
+  esdf_pub_.publish(msg);
 }
 
 void ChompPlanner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {

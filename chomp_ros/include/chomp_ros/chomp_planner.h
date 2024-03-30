@@ -22,12 +22,15 @@ public:
 
   Eigen::MatrixXd get_full_traj(const Eigen::MatrixXd chomp_traj,
                                 const geometry_msgs::Pose start,
-                                const geometry_msgs::Pose goal);
+                                const geometry_msgs::Pose goal) const;
 
   bool getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
                              chomp_msgs::GetTraj::Response& res);
 
+  void updateMap(const wavemap::VolumetricDataStructureBase::Ptr map);
+
   void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
+
 
 private:
   ros::NodeHandle nh_;
@@ -42,6 +45,8 @@ private:
   //wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
   wavemap::HashedWaveletOctree::Ptr hashed_map_;
+  const float kOccupancyThreshold_ = -0.1f;
+  const float kMaxDistance_ = 2.f;
   wavemap::HashedBlocks::Ptr esdf_;
   const float kRobotRadius_ = 0.5f;
   const float kSafetyPadding_ = 0.1f;
