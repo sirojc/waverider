@@ -20,10 +20,14 @@ class ChompPlanner {
 public:
   ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private);
 
-  Eigen::MatrixXd get_full_traj(Eigen::MatrixXd chomp_traj, double yaw_goal);
+  Eigen::MatrixXd get_full_traj(const Eigen::MatrixXd chomp_traj,
+                                const geometry_msgs::Pose start,
+                                const geometry_msgs::Pose goal);
 
   bool getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
                              chomp_msgs::GetTraj::Response& res);
+
+  void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
 
 private:
   ros::NodeHandle nh_;
@@ -33,13 +37,14 @@ private:
   ros::Publisher occupancy_pub_;
   ros::Publisher esdf_pub_;
   ros::Publisher trajectory_pub_;
+  ros::Publisher trajectory_pub_arrows_;
 
   //wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
   wavemap::HashedWaveletOctree::Ptr hashed_map_;
   wavemap::HashedBlocks::Ptr esdf_;
   const float kRobotRadius_ = 0.5f;
-  const float kSafetyPadding_ = 0.f;
+  const float kSafetyPadding_ = 0.1f;
   const float paddedRobotRadius_ = kRobotRadius_ + kSafetyPadding_;
   std::function<float(const Eigen::Vector2d&)> distance_getter_;
 

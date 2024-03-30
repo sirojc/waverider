@@ -13,6 +13,8 @@ Panels:
         - /Occupancy grid1/Map1
         - /Occupancy grid1/Map1/Render grid1
         - /Occupancy grid1/Map1/Render slice1
+        - /MarkerArray1
+        - /MarkerArray1/Status1
       Splitter Ratio: 0.6186915636062622
     Tree Height: 1153
   - Class: rviz/Selection
@@ -277,6 +279,14 @@ Visualization Manager:
       Namespaces:
         goal: true
         start: true
+        trajectory: true
+      Queue Size: 100
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /trajectory_arrows
+      Name: MarkerArray
+      Namespaces:
         trajectory: true
       Queue Size: 100
       Value: true
