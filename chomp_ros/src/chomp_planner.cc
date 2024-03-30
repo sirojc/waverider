@@ -5,7 +5,8 @@
 
 #include <iostream>
 
-ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private) : nh_(nh), nh_private_(nh_private) {
+ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private, double height_robot) : 
+      nh_(nh), nh_private_(nh_private), height_robot_(height_robot) {
   // ros subcribers/ publisher/ service
   occupancy_pub_ = nh.advertise<wavemap_msgs::Map>("map", 10, true);
   esdf_pub_ = nh.advertise<wavemap_msgs::Map>("esdf", 10, true);
@@ -41,7 +42,7 @@ ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private) : nh_
 
   // Define the ESDF distance getter
   distance_getter_ = [this](const Eigen::Vector2d& position_d) {
-    const wavemap::Point3D position(position_d[0], position_d[1], this->paddedRobotRadius_);
+    const wavemap::Point3D position(position_d[0], position_d[1], this->height_robot_);
     if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold_) {
         return wavemap::interpolateTrilinear(*this->esdf_, position);
     } else {
@@ -74,7 +75,7 @@ Eigen::MatrixXd ChompPlanner::get_full_traj(const Eigen::MatrixXd chomp_traj, co
   // x, y given through trajectory
 
   // calculate z for each step
-  Eigen::MatrixXd z_pos = Eigen::MatrixXd::Ones(n_elements, 1) * paddedRobotRadius_; // TODO: MAKE THIS CURRENT HEIGHT ANYMAL (GENERAL NOT ONLY HERE)? Otherwise problems bc ground not at 0?
+  Eigen::MatrixXd z_pos = Eigen::MatrixXd::Ones(n_elements, 1) * height_robot_;
 
   // calculate roll, pitch for each step
   // TODO: CHECK IF NORMAL ANYMAL CONFIGURATION ROLL = 0 AND PITCH = 0 (with simulation)
@@ -122,22 +123,17 @@ bool ChompPlanner::getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
     marker.scale.y = kRobotRadius_;
     marker.scale.z = kRobotRadius_;
     marker.color.a = 0.5;
-    marker.pose.orientation.w = 1.0;
 
     // Publish the start position sphere
     marker.ns = "start";
     marker.color.b = 1.0;
-    marker.pose.position.x = start[0];
-    marker.pose.position.y = start[1];
-    marker.pose.position.z = params_.epsilon; // TODO: DECIDE WHAT TO USE HERE
+    marker.pose = req.start; // TODO: DECIDE WHAT TO USE HERE
     trajectory_pub_.publish(marker);
     // Publish the goal position sphere
     marker.ns = "goal";
     marker.color.b = 0.0;
     marker.color.g = 1.0;
-    marker.pose.position.x = goal[0];
-    marker.pose.position.y = goal[1];
-    marker.pose.position.z = params_.epsilon;
+    marker.pose = req.goal;
     trajectory_pub_.publish(marker);
 
     // publish the start pose arrow
@@ -334,7 +330,7 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh_private("~");
 
   // Create the ChompPlanner object
-  ChompPlanner chomp_planner(nh, nh_private);
+  ChompPlanner chomp_planner(nh, nh_private, 0.65);
   ros::ServiceServer get_traj_service = nh.advertiseService("get_traj", &ChompPlanner::getTrajectoryCallback, &chomp_planner);
 
   // Spin ROS

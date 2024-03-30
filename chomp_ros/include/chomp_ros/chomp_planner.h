@@ -18,7 +18,7 @@
 
 class ChompPlanner {
 public:
-  ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private);
+  ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private, double height_robot);
 
   Eigen::MatrixXd get_full_traj(const Eigen::MatrixXd chomp_traj,
                                 const geometry_msgs::Pose start,
@@ -53,7 +53,8 @@ private:
   const float paddedRobotRadius_ = kRobotRadius_ + kSafetyPadding_;
   std::function<float(const Eigen::Vector2d&)> distance_getter_;
 
-  // traj
+  // robot
+  const double height_robot_;
   const double des_lin_velocity_ = 0.1; // TODO: CHECK WHAT THIS SHOULD BE
   const double des_ang_velocity_ = 0.2;
 
