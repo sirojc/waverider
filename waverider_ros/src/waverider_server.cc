@@ -205,6 +205,25 @@ void WaveriderServer::evaluateAndPublishPolicy() {
       debug_pub_.publish(marker_array);
     }
   }
+
+  // Publish robot state
+  waverider_chomp_msgs::RobotState robot_state_msg;
+  const Eigen::Vector3f position = world_state.p().cast<float>();
+  const Eigen::Vector3f lin_velocity = world_state.v().cast<float>();
+  const Eigen::Vector3f lin_acceleration = world_state.a().cast<float>();
+  const Eigen::Quaterniond orientation = world_state.q();
+  const Eigen::Vector3f ang_velocity = world_state.w().cast<float>();
+  const Eigen::Vector3f ang_acceleration = world_state.dw().cast<float>();
+  
+  // Fill robot_state_msg
+  robot_state_msg.position.data = {position.x(), position.y(), position.z()};
+  robot_state_msg.lin_velocity.data = {lin_velocity.x(), lin_velocity.y(), lin_velocity.z()};
+  robot_state_msg.lin_acceleration.data = {lin_acceleration.x(), lin_acceleration.y(), lin_acceleration.z()};
+  robot_state_msg.orientation.data = {orientation.x(), orientation.y(), orientation.z(), orientation.w()};
+  robot_state_msg.ang_velocity.data = {ang_velocity.x(), ang_velocity.y(), ang_velocity.z()};
+  robot_state_msg.ang_acceleration.data = {ang_acceleration.x(), ang_acceleration.y(), ang_acceleration.z()};
+
+  robot_state_pub_.publish(robot_state_msg);
 }
 
 void WaveriderServer::subscribeToTopics(ros::NodeHandle& nh) {
@@ -225,5 +244,7 @@ void WaveriderServer::advertiseTopics(ros::NodeHandle& nh_private) {
       nh_private.advertise<mav_reactive_planning::PolicyValue>("policy", 1);
   debug_pub_ = nh_private.advertise<visualization_msgs::MarkerArray>(
       "filtered_obstacles", 1);
+  robot_state_pub_ = nh_private.advertise<waverider_chomp_msgs::RobotState>(
+      "robot_state", 1);
 }
 }  // namespace waverider

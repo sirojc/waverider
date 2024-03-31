@@ -1,0 +1,7 @@
+std_msgs/Float64MultiArray position
+std_msgs/Float64MultiArray lin_velocity
+std_msgs/Float64MultiArray lin_acceleration
+
+std_msgs/Float64MultiArray orientation
+std_msgs/Float64MultiArray ang_velocity
+std_msgs/Float64MultiArray ang_acceleration

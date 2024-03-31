@@ -11,6 +11,7 @@
 #include <wavemap/data_structure/volumetric/volumetric_data_structure_base.h>
 #include <wavemap_ros/tf_transformer.h>
 #include <waverider/waverider_policy.h>
+#include <waverider_chomp_msgs/RobotState.h>
 
 namespace waverider {
 struct WaveriderServerConfig : wavemap::ConfigBase<WaveriderServerConfig, 3> {
@@ -74,6 +75,7 @@ class WaveriderServer {
   void advertiseTopics(ros::NodeHandle& nh_private);
   ros::Publisher policy_pub_;
   ros::Publisher debug_pub_;
+  ros::Publisher robot_state_pub_;
 
   ros::ServiceServer srv_level_toggle_;
 };

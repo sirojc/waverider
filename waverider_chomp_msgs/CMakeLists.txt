@@ -18,6 +18,11 @@ add_service_files(
         GetTraj.srv
 )
 
+add_message_files(
+  FILES
+    RobotState.msg
+)
+
 generate_messages(
   DEPENDENCIES
     geometry_msgs
