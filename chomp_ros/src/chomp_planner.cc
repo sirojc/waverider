@@ -5,9 +5,11 @@
 
 #include <iostream>
 
+namespace chomp {
+
 ChompPlanner::ChompPlanner(ros::NodeHandle nh, ros::NodeHandle nh_private, double height_robot) : 
       nh_(nh), nh_private_(nh_private), height_robot_(height_robot) {
-  // ros subcribers/ publisher/ service
+  // ros subcribers/ publisher
   occupancy_pub_ = nh.advertise<wavemap_msgs::Map>("map", 10, true);
   esdf_pub_ = nh.advertise<wavemap_msgs::Map>("esdf", 10, true);
   trajectory_pub_ = nh.advertise<visualization_msgs::Marker>("trajectory", 10, true);
@@ -103,8 +105,8 @@ Eigen::MatrixXd ChompPlanner::get_full_traj(const Eigen::MatrixXd chomp_traj, co
 }
 
 // TODO: THINK ABOUT HOW TO HANDLE START AND GOAL
-bool ChompPlanner::getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
-                                         chomp_msgs::GetTraj::Response& res) {    
+bool ChompPlanner::getTrajectoryService(waverider_chomp_msgs::GetTraj::Request& req,
+                                         waverider_chomp_msgs::GetTraj::Response& res) {    
   // TODO: rosservice: first check if requested goal is collisionfree and then calculate path
 
   Eigen::Vector2d start(req.start.position.x, req.start.position.y);
@@ -160,15 +162,7 @@ bool ChompPlanner::getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
   chomp_.solveProblem(start, goal, N, &chomp_output);
 
   // Check if the trajectory is collision free
-  bool is_collision_free = true;
-  for (int idx = 0; idx < chomp_output.trajectory.rows(); ++idx) {
-    const auto position = chomp_output.trajectory.row(idx);
-    const float esdf_distance = distance_getter_(position);
-    if (esdf_distance <= kRobotRadius_) {
-      is_collision_free = false;
-      break;
-    }
-  }
+  bool is_collision_free = checkTrajCollision(chomp_output.trajectory);
 
   if (!is_collision_free) {
     LOG(INFO) << "Solution trajectory is NOT collision free";
@@ -228,6 +222,21 @@ bool ChompPlanner::getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
   }
 
   return true;
+}
+
+bool ChompPlanner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
+  // check if the trajectory is collision free
+  bool is_collision_free = true;
+  for (int idx = 0; idx < trajectory.rows(); ++idx) {
+    const auto position = trajectory.row(idx);
+    const float esdf_distance = distance_getter_(position);
+    if (esdf_distance <= kRobotRadius_) {
+      is_collision_free = false;
+      break;
+    }
+  }
+
+  return is_collision_free;
 }
 
 void ChompPlanner::updateMap(const wavemap::VolumetricDataStructureBase::Ptr map) {
@@ -315,6 +324,7 @@ void ChompPlanner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const 
   trajectory_pub_arrows_.publish(trajectory_arrow_msg);
 }
 
+}  //  namespace chomp
 
 int main(int argc, char** argv) {
   // Initialize logging
@@ -330,8 +340,8 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh_private("~");
 
   // Create the ChompPlanner object
-  ChompPlanner chomp_planner(nh, nh_private, 0.65);
-  ros::ServiceServer get_traj_service = nh.advertiseService("get_traj", &ChompPlanner::getTrajectoryCallback, &chomp_planner);
+  chomp::ChompPlanner chomp_planner(nh, nh_private, 0.65);
+  ros::ServiceServer get_traj_service = nh.advertiseService("get_traj", &chomp::ChompPlanner::getTrajectoryService, &chomp_planner);
 
   // Spin ROS
   ros::spin();

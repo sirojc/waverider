@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(chomp_msgs)
+project(waverider_chomp_msgs)
 
 set(CATKIN_PACKAGE_DEPENDENCIES
     geometry_msgs

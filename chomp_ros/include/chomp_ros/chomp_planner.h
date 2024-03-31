@@ -1,3 +1,6 @@
+#ifndef CHOMP_ROS_CHOMP_PLANNER_H_
+#define CHOMP_ROS_CHOMP_PLANNER_H_
+
 #include <glog/logging.h>
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
@@ -12,9 +15,10 @@
 #include <wavemap_ros_conversions/map_msg_conversions.h>
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_msgs/Path.h"
-#include <chomp_msgs/GetTraj.h>
+#include <waverider_chomp_msgs/GetTraj.h>
 #include "chomp_ros/chomp_optimizer.h"
 
+namespace chomp {
 
 class ChompPlanner {
 public:
@@ -24,19 +28,20 @@ public:
                                 const geometry_msgs::Pose start,
                                 const geometry_msgs::Pose goal) const;
 
-  bool getTrajectoryCallback(chomp_msgs::GetTraj::Request& req,
-                             chomp_msgs::GetTraj::Response& res);
+  bool checkTrajCollision(const Eigen::MatrixXd& trajectory) const;
 
   void updateMap(const wavemap::VolumetricDataStructureBase::Ptr map);
 
   void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
 
+  bool getTrajectoryService(waverider_chomp_msgs::GetTraj::Request& req,
+                             waverider_chomp_msgs::GetTraj::Response& res);
 
 private:
   ros::NodeHandle nh_;
   ros::NodeHandle nh_private_;
 
-  // ros subscriber/ publisher/ service
+  // ros subscriber/ publisher
   ros::Publisher occupancy_pub_;
   ros::Publisher esdf_pub_;
   ros::Publisher trajectory_pub_;
@@ -63,5 +68,7 @@ private:
   chomp::ChompParameters params_;
 };
 
+}  //  namespace chomp
 
+#endif  // CHOMP_ROS_CHOMP_PLANNER_H_
 

@@ -15,7 +15,7 @@
 
   <depend>roscpp</depend>
   <depend>waverider</depend>
-  <depend>chomp_msgs</depend>
+  <depend>waverider_chomp_msgs</depend>
   <depend>wavemap</depend>
   <depend>wavemap_io</depend>
   <depend>wavemap_ros_conversions</depend>
