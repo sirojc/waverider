@@ -1,0 +1,28 @@
+<launch>
+  <!-- Wavemap params -->
+  <arg name="param_file_wavemap"
+       default="$(find wavemap_ros)/config/alma_hashed_wavelet.yaml"
+       doc="Name of the file from which to read wavemap's server params."/>
+  <arg name="param_file_waverider"
+       default="$(find waverider_ros)/config/alma_waverider.yaml"
+       doc="Name of the file from which to read waverider's server params."/>
+  <arg name="show_rviz" value="true" />
+ 
+ <!-- Link TF frames -->
+ <!-- <node pkg="tf2_ros"
+        type="static_transform_publisher"
+        name="link_base_odom"
+        args="0 0 0.5 0.0 0.0 0.0 1.0
+            base odom"/> -->
+
+  <!-- Run waverider -->
+  <node name="waverider_server" pkg="waverider_ros"
+        type="waverider_server_node"
+        output="screen" launch-prefix="">
+    <rosparam file="$(arg param_file_wavemap)" ns="mapper"/>
+    <rosparam file="$(arg param_file_waverider)"/>
+<!--    <remap from="/current_reference" to="/stork/command/current_reference" /> -->
+  </node>
+
+
+</launch>
