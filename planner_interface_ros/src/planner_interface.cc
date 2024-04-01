@@ -9,20 +9,20 @@ PlannerInterface::PlannerInterface(ros::NodeHandle nh, ros::NodeHandle nh_privat
   // ros subcribers/ publisher
   occupancy_pub_ = nh.advertise<wavemap_msgs::Map>("map", 10, true);
   esdf_pub_ = nh.advertise<wavemap_msgs::Map>("esdf", 10, true);
+  waverider_map_pub_ = nh_private.advertise<visualization_msgs::MarkerArray>("filtered_obstacles", 1);
   state_pub_ = nh.advertise<visualization_msgs::Marker>("rmp_state", 10, true);
   trajectory_pub_ = nh.advertise<visualization_msgs::Marker>("trajectory", 10, true);
   trajectory_pub_arrows_ = nh.advertise<visualization_msgs::MarkerArray>("trajectory_arrows", 10, true);
   
   // TODO: MAKE MAP UPDATE AND NOT FROM FILE, CHECK WAVERIDER HOW THEY DO IT
   // Load the occupancy map
-  // wavemap::io::fileToMap(
-  //     "/home/nicole/ros/git/wavemap/data/example_maps/newer_college_mine_5cm.wvmp", occupancy_map);
+  // wavemap::io::fileToMap("/home/nicole/ros/git/wavemap/data/example_maps/newer_college_mine_5cm.wvmp", occupancy_map_);
   wavemap::io::fileToMap("/home/nicole/ros/git/wavemap/data/anymal/map_lab.wvmp", occupancy_map_);
   CHECK_NOTNULL(occupancy_map_);
 
   // Publish the occupancy map
   wavemap_msgs::Map occupancy_map_msg;
-  wavemap::convert::mapToRosMsg(*occupancy_map_, "odom", ros::Time::now(),
+  wavemap::convert::mapToRosMsg(*occupancy_map_, world_frame_, ros::Time::now(),
                                 occupancy_map_msg);
   occupancy_pub_.publish(occupancy_map_msg);
 
@@ -37,7 +37,7 @@ PlannerInterface::PlannerInterface(ros::NodeHandle nh, ros::NodeHandle nh_privat
 
   // Publish the ESDF
   wavemap_msgs::Map msg;
-  wavemap::convert::mapToRosMsg(*esdf_, "odom", ros::Time::now(), msg);
+  wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
   esdf_pub_.publish(msg);
 
   // Define the ESDF distance getter
@@ -126,7 +126,7 @@ void PlannerInterface::updateMap(const wavemap::VolumetricDataStructureBase::Ptr
   occupancy_map_ = map;
   
   wavemap_msgs::Map occupancy_map_msg;
-  wavemap::convert::mapToRosMsg(*occupancy_map_, "odom", ros::Time::now(), occupancy_map_msg);
+  wavemap::convert::mapToRosMsg(*occupancy_map_, world_frame_, ros::Time::now(), occupancy_map_msg);
   occupancy_pub_.publish(occupancy_map_msg);
 
   // update hashed map
@@ -139,14 +139,14 @@ void PlannerInterface::updateMap(const wavemap::VolumetricDataStructureBase::Ptr
   esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
 
   wavemap_msgs::Map msg;
-  wavemap::convert::mapToRosMsg(*esdf_, "odom", ros::Time::now(), msg);
+  wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
   esdf_pub_.publish(msg);
 }
 
 void PlannerInterface::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
   LOG(INFO) << "Publishing trajectory";
   visualization_msgs::Marker trajectory_msg;
-  trajectory_msg.header.frame_id = "odom";
+  trajectory_msg.header.frame_id = world_frame_;
   trajectory_msg.header.stamp = ros::Time::now();
   trajectory_msg.type = visualization_msgs::Marker::LINE_STRIP;
   trajectory_msg.action = visualization_msgs::Marker::ADD;
@@ -169,7 +169,7 @@ void PlannerInterface::visualizeTrajectory(const Eigen::MatrixXd& trajectory) co
 
     if (idx % 50 == 0) {
       visualization_msgs::Marker arrow;
-      arrow.header.frame_id = "odom";
+      arrow.header.frame_id = world_frame_;
       arrow.header.stamp = ros::Time::now();
       arrow.ns = "trajectory";
       arrow.id = idx; // Use idx as the unique ID for each marker
@@ -218,7 +218,7 @@ void PlannerInterface::visualizeState(const Eigen::Vector3d& pos) const {
 
   // Set up the marker
   visualization_msgs::Marker marker;
-  marker.header.frame_id = "map";
+  marker.header.frame_id = world_frame_;
   marker.header.stamp = ros::Time::now();
   marker.id = 100;
   marker.type = visualization_msgs::Marker::SPHERE;
@@ -243,7 +243,7 @@ bool PlannerInterface::getTrajectoryService(waverider_chomp_msgs::GetTraj::Reque
   {
     // Set up the marker
     visualization_msgs::Marker marker;
-    marker.header.frame_id = "odom";
+    marker.header.frame_id = world_frame_;
     marker.header.stamp = ros::Time::now();
     marker.id = 100;
     marker.type = visualization_msgs::Marker::SPHERE;
@@ -319,7 +319,7 @@ bool PlannerInterface::getTrajectoryService(waverider_chomp_msgs::GetTraj::Reque
     double delta_t = 0.0;
     for (int idx = 0; idx < full_traj.rows(); ++idx) {
       geometry_msgs::PoseStamped traj_step;
-      traj_step.header.frame_id = "map"; // TODO: THINK ABOUT WHICH FRAME TO USE
+      traj_step.header.frame_id = world_frame_; // TODO: THINK ABOUT WHICH FRAME TO USE
 
       // time - TODO: THIS CORRESPONDS TO THE TIME WHEN TRAJ. SHOULD BE EXECUTED RIGHT?
       if (idx > 0) {
@@ -414,10 +414,13 @@ Eigen::MatrixXd PlannerInterface::getWaveriderTrajectory(const geometry_msgs::Po
 
     // sum policies
     if((last_updated_pos - state.pos_).norm() > 0.1) {
-     waverider_policy.updateObstacles(*hashed_map_, state.pos_.cast<float>());
-     //visualization_msgs::MarkerArray marker_array;
-      //addFilteredObstaclesToMarkerArray(waverider_policy.getObstacleCells(),"map", marker_array);
-     // debug_pub_.publish(marker_array);
+      waverider_policy.updateObstacles(*hashed_map_, state.pos_.cast<float>());
+     
+      // visualization
+      visualization_msgs::MarkerArray marker_array;
+      waverider::addFilteredObstaclesToMarkerArray(waverider_policy.getObstacleCells(), world_frame_, marker_array);
+      waverider_map_pub_.publish(marker_array);
+
       last_updated_pos = state.pos_;
     }
 

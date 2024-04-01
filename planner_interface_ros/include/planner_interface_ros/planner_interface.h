@@ -21,8 +21,7 @@
 #include "nav_msgs/Path.h"
 #include <waverider_chomp_msgs/GetTraj.h>
 #include <waverider_chomp_msgs/PlannerType.h>
-
-#include <waverider/eval_planner.h>
+#include <waverider_ros/policy_visuals.h>
 #include <waverider/waverider_policy.h>
 #include <rmpcpp/policies/simple_target_policy.h>
 #include <rmpcpp/eval/integrator.h>
@@ -62,6 +61,7 @@ private:
   // ros subscriber/ publisher
   ros::Publisher occupancy_pub_;
   ros::Publisher esdf_pub_;
+  ros::Publisher waverider_map_pub_;
   ros::Publisher state_pub_;
   ros::Publisher trajectory_pub_;
   ros::Publisher trajectory_pub_arrows_;
@@ -78,6 +78,7 @@ private:
   std::function<float(const Eigen::Vector2d&)> distance_getter_;
 
   // robot
+  const std::string world_frame_ = "odom";
   const double height_robot_;
   const double des_lin_velocity_ = 0.1; // TODO: CHECK WHAT THIS SHOULD BE
   const double des_ang_velocity_ = 0.2;
@@ -87,8 +88,10 @@ private:
   chomp::ChompParameters params_;
 
   // waverider
-  bool flat_res_ = false;
-  double flat_res_radius_ = 0.0;
+  // bool flat_res_ = false;
+  bool flat_res_ = true;
+  // double flat_res_radius_ = 0.0;
+  double flat_res_radius_ = 1.0;
   size_t max_integration_steps_{10000};
 
 };
