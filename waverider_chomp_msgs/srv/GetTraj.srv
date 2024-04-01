@@ -1,5 +1,6 @@
 geometry_msgs/Pose start
 geometry_msgs/Pose goal
+waverider_chomp_msgs/PlannerType planner_type
 
 ---
 

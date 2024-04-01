@@ -65,7 +65,9 @@ int main(int argc, char** argv) {
 
   // load map and ESDF
   std::string occupancy_file_path =
-      "/home/mpantic/Work/waverider/meps/newer_college_mine_10cm.wvmp";
+      "/home/nicole/ros/git/wavemap/data/example_maps/newer_college_mine_5cm.wvmp";
+  // std::string occupancy_file_path =
+  //     "/home/nicole/ros/git/wavemap/data/anymal/map_lab.wvmp";
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map;
   wavemap::io::fileToMap(occupancy_file_path, occupancy_map);
 

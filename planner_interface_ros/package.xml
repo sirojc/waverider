@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>planner_interface_ros</name>
+  <version>0.0.0</version>
+  <description>Planner interface for waverider_ros and chomp_ros.</description>
+
+  <maintainer email="nospelt@ethz.ch">Nicole Ospelt</maintainer>
+  <license>BSD</license>
+  <url>https://github.com/ethz-asl/waverider</url>
+
+  <author email="nospelt@ethz.ch">Nicole Ospelt</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+
+  <depend>roscpp</depend>
+  <depend>waverider</depend>
+  <depend>waverider_chomp_msgs</depend>
+  <depend>waverider_ros</depend>
+  <depend>chomp_ros</depend>
+  <depend>wavemap</depend>
+  <depend>wavemap_io</depend>
+  <depend>wavemap_ros_conversions</depend>
+</package>
