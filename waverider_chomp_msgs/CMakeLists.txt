@@ -6,11 +6,21 @@ set(CATKIN_PACKAGE_DEPENDENCIES
     message_generation
     std_msgs
     nav_msgs
+    navigation_msgs
+    actionlib_msgs
 )
 
 find_package(catkin REQUIRED
   COMPONENTS
 ${CATKIN_PACKAGE_DEPENDENCIES}
+)
+
+add_action_files(
+  DIRECTORY
+    action
+  FILES
+    PlanToGoalLocalGuidance.action
+    PlanToGoalPlanner.action
 )
 
 add_service_files(
@@ -29,6 +39,8 @@ generate_messages(
     geometry_msgs
     std_msgs
     nav_msgs
+    navigation_msgs
+    actionlib_msgs
 )
 
 catkin_package(

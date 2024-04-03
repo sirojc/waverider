@@ -1,5 +1,5 @@
-#ifndef PLANNER_INTERFACE_ROS_PLANNER_INTERFACE_H_
-#define PLANNER_INTERFACE_ROS_PLANNER_INTERFACE_H_
+#ifndef WAVERIDER_CHOMP_PLANNER_WAVERIDER_CHOMP_PLANNER_H_
+#define WAVERIDER_CHOMP_PLANNER_WAVERIDER_CHOMP_PLANNER_H_
 
 #include <glog/logging.h>
 #include <ros/ros.h>
@@ -27,33 +27,52 @@
 #include <rmpcpp/eval/integrator.h>
 #include "chomp_ros/chomp_optimizer.h"
 
-namespace planner_interface {
+#include <actionlib/server/simple_action_server.h>
+#include <waverider_chomp_msgs/PlanToGoalPlannerAction.h>
 
-class PlannerInterface {
+
+namespace waverider_chomp_planner {
+
+class Planner {
 public:
-  PlannerInterface(ros::NodeHandle nh, ros::NodeHandle nh_private, double height_robot);
+  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private);
 
+  void processActionServerGoals(ros::AsyncSpinner& spinner);
+  void goalCB();
+  void preemptCB();
+  
   bool checkTrajCollision(const Eigen::MatrixXd& trajectory) const;
+
+
+  void getTrajectory(const geometry_msgs::Pose& start,
+                     const geometry_msgs::Pose& goal,
+                     const waverider_chomp_msgs::PlannerType& planner_type);
+  Eigen::MatrixXd getChompTrajectory(const geometry_msgs::Pose& start,
+                                     const geometry_msgs::Pose& goal);
+  Eigen::MatrixXd getWaveriderTrajectory(const geometry_msgs::Pose& start,
+                                         const geometry_msgs::Pose& goal);
 
   Eigen::MatrixXd get_full_traj(const Eigen::MatrixXd chomp_traj,
                                 const geometry_msgs::Pose start,
                                 const geometry_msgs::Pose goal) const;
 
-  void updateMap(const wavemap::VolumetricDataStructureBase::Ptr map);
+  void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
+  void updateMap();
 
   void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
   void visualizeState(const Eigen::Vector3d& pos) const;
 
-  bool getTrajectoryService(waverider_chomp_msgs::GetTraj::Request& req,
-                            waverider_chomp_msgs::GetTraj::Response& res);
-
-  Eigen::MatrixXd getChompTrajectory(const geometry_msgs::Pose& start,
-                                     const geometry_msgs::Pose& goal);
-
-  Eigen::MatrixXd getWaveriderTrajectory(const geometry_msgs::Pose& start,
-                                         const geometry_msgs::Pose& goal);
-
 private:
+  // action stuff
+  using PlanningActionServer = actionlib::SimpleActionServer<waverider_chomp_msgs::PlanToGoalPlannerAction>;
+  // using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalPlannerFeedbackPtr;
+
+  using Goal = PlanningActionServer::Goal;
+  using Feedback = PlanningActionServer::Feedback;
+
+  PlanningActionServer get_path_action_srv_;
+  // PlanningFeedbackPtr planning_feedback_{new waverider_chomp_msgs::PlanToGoalPlannerFeedback()};
+
   // ROS members
   ros::NodeHandle nh_;
   ros::NodeHandle nh_private_;
@@ -67,7 +86,7 @@ private:
 
   ros::Subscriber map_sub_;
 
-  //wavemap
+  // wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
   wavemap::HashedWaveletOctree::Ptr hashed_map_;
   const float kOccupancyThreshold_ = -0.1f;
@@ -80,7 +99,7 @@ private:
 
   // robot
   const std::string world_frame_ = "odom";
-  const double height_robot_;
+  const double height_robot_ = 0.65; // TODO: get from start
   const double des_lin_velocity_ = 0.1; // TODO: CHECK WHAT THIS SHOULD BE
   const double des_ang_velocity_ = 0.2;
 
@@ -94,9 +113,8 @@ private:
   // double flat_res_radius_ = 0.0;
   double flat_res_radius_ = 1.0;
   size_t max_integration_steps_{10000};
-
 };
 
-}  //  planner_interface
+}  //  waverider_chomp_planner
 
-#endif  // PLANNER_INTERFACE_ROS_PLANNER_INTERFACE_H_
+#endif  // WAVERIDER_CHOMP_PLANNER_WAVERIDER_CHOMP_PLANNER_H_

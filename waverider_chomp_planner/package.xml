@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>planner_interface_ros</name>
+  <name>waverider_chomp_planner</name>
   <version>0.0.0</version>
   <description>Planner interface for waverider_ros and chomp_ros.</description>
 
