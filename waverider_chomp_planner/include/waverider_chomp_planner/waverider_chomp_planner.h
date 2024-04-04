@@ -33,6 +33,12 @@
 
 namespace waverider_chomp_planner {
 
+using PlanningActionServer = actionlib::SimpleActionServer<waverider_chomp_msgs::PlanToGoalPlannerAction>;
+using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalPlannerFeedbackPtr;
+
+using Feedback = PlanningActionServer::Feedback;
+using FeedbackStatus = Feedback::_status_local_planner_type;
+
 class Planner {
 public:
   Planner(ros::NodeHandle nh, ros::NodeHandle nh_private);
@@ -40,6 +46,7 @@ public:
   void processActionServerGoals(ros::AsyncSpinner& spinner);
   void goalCB();
   void preemptCB();
+  void publishLocalPlannerFeedback(FeedbackStatus feedback);
   
   bool checkTrajCollision(const Eigen::MatrixXd& trajectory) const;
 
@@ -57,21 +64,16 @@ public:
                                 const geometry_msgs::Pose goal) const;
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
-  void updateMap();
+  void updateMap(bool update_esdf);
 
   void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
   void visualizeState(const Eigen::Vector3d& pos) const;
 
 private:
   // action stuff
-  using PlanningActionServer = actionlib::SimpleActionServer<waverider_chomp_msgs::PlanToGoalPlannerAction>;
-  // using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalPlannerFeedbackPtr;
-
-  using Goal = PlanningActionServer::Goal;
-  using Feedback = PlanningActionServer::Feedback;
-
   PlanningActionServer get_path_action_srv_;
-  // PlanningFeedbackPtr planning_feedback_{new waverider_chomp_msgs::PlanToGoalPlannerFeedback()};
+  // Feedback planning_feedback_;
+  PlanningFeedbackPtr feedback_{new waverider_chomp_msgs::PlanToGoalPlannerFeedback()};
 
   // ROS members
   ros::NodeHandle nh_;
@@ -99,7 +101,7 @@ private:
 
   // robot
   const std::string world_frame_ = "odom";
-  const double height_robot_ = 0.65; // TODO: get from start
+  double height_robot_ = 0.65; // TODO: get from start
   const double des_lin_velocity_ = 0.1; // TODO: CHECK WHAT THIS SHOULD BE
   const double des_ang_velocity_ = 0.2;
 

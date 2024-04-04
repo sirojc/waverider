@@ -99,8 +99,8 @@ bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
 void Planner::getTrajectory(const geometry_msgs::Pose& start,
                             const geometry_msgs::Pose& goal,
                             const waverider_chomp_msgs::PlannerType& planner_type) {
-  // TODO: rosservice: first check if requested goal is collisionfree and then calculate path
-
+  publishLocalPlannerFeedback(Feedback::PLANNING);
+  
   // Publish the start and goal positions
   {
     // Set up the marker
@@ -172,7 +172,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
     visualizeTrajectory(full_traj);
 
     // response trajectory
-    nav_msgs::Path path;
+    nav_msgs::Path path; // TODO: CHANGE TO navigation_msgs/PathLocalGuidance
 
     // set response trajector
     double prev_time = 0.0;
@@ -355,7 +355,7 @@ void Planner::callbackMap(const wavemap_msgs::Map::ConstPtr& msg) {
   wavemap::convert::rosMsgToMap(*msg, occupancy_map_);
 }
 
-void Planner::updateMap() {
+void Planner::updateMap(bool update_esdf) {
   // republish occupancy map, use latest received occupancy map
   wavemap_msgs::Map occupancy_map_msg;
   wavemap::convert::mapToRosMsg(*occupancy_map_, world_frame_, ros::Time::now(), occupancy_map_msg);
@@ -367,12 +367,14 @@ void Planner::updateMap() {
     ROS_ERROR("Failed to cast occupancy map to HashedWaveletOctree.");
   }
 
-  // update and publish esdf
-  esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
+  if (update_esdf) {
+    // update and publish esdf
+    esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
 
-  wavemap_msgs::Map msg;
-  wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
-  esdf_pub_.publish(msg);
+    wavemap_msgs::Map msg;
+    wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
+    esdf_pub_.publish(msg);
+  }
 }
 
 
@@ -468,28 +470,47 @@ void Planner::visualizeState(const Eigen::Vector3d& pos) const {
 
 }
 
+void Planner::publishLocalPlannerFeedback(FeedbackStatus feedback) {
+  feedback_->status_local_planner = feedback;
+  get_path_action_srv_.publishFeedback(feedback_);
+}
 
 void Planner::goalCB() {
   ROS_INFO("goalCB");
   
-  // TODO: CALL update_map here to calculate map
-
-  // TODO: check if start is collision free
-
-  // TODO: check if goal is collision free
-
-  // accept the new goal
+  // get the new goal
   auto plan_goal = get_path_action_srv_.acceptNewGoal();
 
   geometry_msgs::Pose start_pose = plan_goal->start_pose;
   geometry_msgs::Pose goal_pose = plan_goal->goal_pose;
   waverider_chomp_msgs::PlannerType planner_type = plan_goal->planner_type;
 
+  // update map to get newest data
+  // updateMap(planner_type == waverider_chomp_msgs::CHOMP);
+
+  // adapt robot height
+  height_robot_ = start_pose.position.z;
+
+  // TODO: check if start is collision free
+  double min_distance = distance_getter_(Eigen::Vector2d(start_pose.position.x, start_pose.position.y));
+  if (min_distance < kRobotRadius_) {
+    publishLocalPlannerFeedback(Feedback::INVALID_START);
+    return;
+  }
+
+  // TODO: check if goal is collision free
+  min_distance = distance_getter_(Eigen::Vector2d(goal_pose.position.x, goal_pose.position.y));
+  if (min_distance < kRobotRadius_) {
+    publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
+    return;
+  }
+
   getTrajectory(start_pose, goal_pose, planner_type);
 }
 
 void Planner::preemptCB() {
   ROS_INFO("preemptCB");
+
   // set the action state to preempted
   get_path_action_srv_.setPreempted();
 }
