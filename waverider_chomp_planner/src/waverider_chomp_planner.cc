@@ -485,13 +485,10 @@ void Planner::goalCB() {
   
   // get the new goal
   auto plan_req = get_path_action_srv_.acceptNewGoal();
-  std::cout << "---------------- 1" << std::endl;
 
   int n_elements = plan_req->path.path_segments.size();
   navigation_msgs::PoseStamped start_pose = plan_req->path.path_segments[0].goal;
-  std::cout << "---------------- 1" << std::endl;
   navigation_msgs::PoseStamped goal_pose = plan_req->path.path_segments[n_elements - 1].goal;
-  std::cout << "---------------- 3" << std::endl;
   // // waverider_chomp_msgs::PlannerType planner_type = plan_req->planner_type; // TODO: ADD CHOICE IN MESSAGE OR WHEN STARTUP PLANNER?
   waverider_chomp_msgs::PlannerType planner_type;
   planner_type.type = waverider_chomp_msgs::PlannerType::CHOMP;
@@ -499,26 +496,26 @@ void Planner::goalCB() {
   std::cout << "---------------- start_pose: " << std::endl << start_pose << std::endl;
   std::cout << "---------------- goal_pose: " << std::endl << goal_pose << std::endl;
 
+  // update map to get newest data
+  // updateMap(planner_type == waverider_chomp_msgs::CHOMP);
 
-  // // update map to get newest data
-  // // updateMap(planner_type == waverider_chomp_msgs::CHOMP);
+  // adapt robot height
+  height_robot_ = start_pose.pose.position.z;
 
-  // // adapt robot height
-  // height_robot_ = start_pose.position.z;
+  double min_distance = distance_getter_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
+  if (min_distance < kRobotRadius_) {
+    publishLocalPlannerFeedback(Feedback::INVALID_START);
+    ROS_INFO("Not planning, start pose invalid");
+    return;
+  }
 
-  // // TODO: check if start is collision free
-  // double min_distance = distance_getter_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
-  // if (min_distance < kRobotRadius_) {
-  //   publishLocalPlannerFeedback(Feedback::INVALID_START);
-  //   return;
-  // }
-
-  // // TODO: check if goal is collision free
-  // min_distance = distance_getter_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
-  // if (min_distance < kRobotRadius_) {
-  //   publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
-  //   return;
-  // }
+  // TODO: check if goal is collision free
+  min_distance = distance_getter_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
+  if (min_distance < kRobotRadius_) {
+    publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
+    ROS_INFO("Not planning, goal pose invalid");
+    return;
+  }
 
   getTrajectory(start_pose.pose, goal_pose.pose, planner_type, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
 }
