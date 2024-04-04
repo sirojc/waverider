@@ -5,7 +5,7 @@
 namespace waverider_chomp_planner {
 
 Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private)
-  : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "plan_path", false) {
+  : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_chomp_planner/plan_path", false) {
   std::cout << "1" << std::endl;
   //register the goal and feeback callbacks
   get_path_action_srv_.registerGoalCallback(boost::bind(&Planner::goalCB, this));
@@ -33,7 +33,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private)
 
   // Publish the occupancy map
   wavemap_msgs::Map occupancy_map_msg;
-  wavemap::convert::mapToRosMsg(*occupancy_map_, world_frame_, ros::Time::now(),
+  wavemap::convert::mapToRosMsg(*occupancy_map_, planner_frame_, ros::Time::now(),
                                 occupancy_map_msg);
   occupancy_pub_.publish(occupancy_map_msg);
 
@@ -48,7 +48,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private)
 
   // Publish the ESDF
   wavemap_msgs::Map msg;
-  wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
+  wavemap::convert::mapToRosMsg(*esdf_, planner_frame_, ros::Time::now(), msg);
   esdf_pub_.publish(msg);
 
   // Define the ESDF distance getter
@@ -98,14 +98,17 @@ bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
 
 void Planner::getTrajectory(const geometry_msgs::Pose& start,
                             const geometry_msgs::Pose& goal,
-                            const waverider_chomp_msgs::PlannerType& planner_type) {
+                            const waverider_chomp_msgs::PlannerType& planner_type,
+                            const bool ignore_orientation,
+                            const navigation_msgs::Tolerance tol,
+                            const std::string local_guidance_mode) {
   publishLocalPlannerFeedback(Feedback::PLANNING);
   
   // Publish the start and goal positions
   {
     // Set up the marker
     visualization_msgs::Marker marker;
-    marker.header.frame_id = world_frame_;
+    marker.header.frame_id = planner_frame_;
     marker.header.stamp = ros::Time::now();
     marker.id = 100;
     marker.type = visualization_msgs::Marker::SPHERE;
@@ -161,9 +164,11 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
 
   if (!is_collision_free) {
     LOG(INFO) << "Solution trajectory is NOT collision free";
+    publishLocalPlannerFeedback(Feedback::NO_SOLUTION);
     return;
   } else {
     LOG(INFO) << "Solution trajectory is collision free";
+    publishLocalPlannerFeedback(Feedback::FOUND_SOLUTION);
   
     // get the full trajectory
     Eigen::MatrixXd full_traj = get_full_traj(traj, start, goal);
@@ -172,29 +177,27 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
     visualizeTrajectory(full_traj);
 
     // response trajectory
-    nav_msgs::Path path; // TODO: CHANGE TO navigation_msgs/PathLocalGuidance
+    navigation_msgs::PathLocalGuidance optimized_path;
+    navigation_msgs::PathSegmentLocalGuidance segment;
+    
+    // Set values that are the same for all.
+    segment.goal.tol = tol;
+    segment.goal.ignore_orientation = ignore_orientation;
+    segment.goal.header.frame_id = planner_frame_;
+    segment.goal.header.stamp = ros::Time::now();
+    segment.local_guidance_mode = local_guidance_mode;
+    optimized_path.header = segment.goal.header;
 
-    // set response trajector
+    // set response trajectory
     double prev_time = 0.0;
     double delta_t = 0.0;
     for (int idx = 0; idx < full_traj.rows(); ++idx) {
-      geometry_msgs::PoseStamped traj_step;
-      traj_step.header.frame_id = world_frame_; // TODO: THINK ABOUT WHICH FRAME TO USE
-
-      // time - TODO: THIS CORRESPONDS TO THE TIME WHEN TRAJ. SHOULD BE EXECUTED RIGHT?
-      if (idx > 0) {
-        double diff_pos = (full_traj.row(idx + 1).head(2) - full_traj.row(idx).head(2)).norm();
-        double diff_angle = fmod(full_traj(idx + 1, 3) - full_traj(idx, 3), 2 * M_PI);
-
-        delta_t = std::max(diff_pos / des_lin_velocity_, diff_angle / des_ang_velocity_);
-      }
-      prev_time += delta_t;
-      traj_step.header.stamp = ros::Time(prev_time);
+      geometry_msgs::Pose traj_step;
 
       // position
-      traj_step.pose.position.x = full_traj(idx, 0);
-      traj_step.pose.position.y = full_traj(idx, 1);
-      traj_step.pose.position.z = full_traj(idx, 2);
+      traj_step.position.x = full_traj(idx, 0);
+      traj_step.position.y = full_traj(idx, 1);
+      traj_step.position.z = full_traj(idx, 2);
 
       // get quaternion from euler angles
       Eigen::Quaterniond q_curr;
@@ -202,23 +205,25 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
                * Eigen::AngleAxisd(full_traj(idx, 4), Eigen::Vector3d::UnitY())
                * Eigen::AngleAxisd(full_traj(idx, 5), Eigen::Vector3d::UnitZ());
 
-      traj_step.pose.orientation.x = q_curr.x();  
-      traj_step.pose.orientation.y = q_curr.y();
-      traj_step.pose.orientation.z = q_curr.z();
-      traj_step.pose.orientation.w = q_curr.w();
+      traj_step.orientation.x = q_curr.x();  
+      traj_step.orientation.y = q_curr.y();
+      traj_step.orientation.z = q_curr.z();
+      traj_step.orientation.w = q_curr.w();
 
-      path.poses.push_back(traj_step);
+      segment.goal.pose = traj_step;
+      optimized_path.path_segments.push_back(segment);
     }
 
-    // res.trajectory = path;
+    // Send path as feedback
+    feedback_->path_optimized = optimized_path;
+    publishLocalPlannerFeedback(Feedback::PUBLISHED_SOLUTION);
   }
 
   return;
 }
 
-// TODO: THINK ABOUT HOW TO HANDLE START AND GOAL
 Eigen::MatrixXd Planner::getChompTrajectory(const geometry_msgs::Pose& start,
-                                                     const geometry_msgs::Pose& goal) {    
+                                            const geometry_msgs::Pose& goal) {    
   Eigen::Vector2d start_pos(start.position.x, start.position.y);
   Eigen::Vector2d goal_pos(goal.position.x, goal.position.y);
   
@@ -278,7 +283,7 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
      
       // visualization
       visualization_msgs::MarkerArray marker_array;
-      waverider::addFilteredObstaclesToMarkerArray(waverider_policy.getObstacleCells(), world_frame_, marker_array);
+      waverider::addFilteredObstaclesToMarkerArray(waverider_policy.getObstacleCells(), planner_frame_, marker_array);
       waverider_map_pub_.publish(marker_array);
 
       last_updated_pos = state.pos_;
@@ -358,7 +363,7 @@ void Planner::callbackMap(const wavemap_msgs::Map::ConstPtr& msg) {
 void Planner::updateMap(bool update_esdf) {
   // republish occupancy map, use latest received occupancy map
   wavemap_msgs::Map occupancy_map_msg;
-  wavemap::convert::mapToRosMsg(*occupancy_map_, world_frame_, ros::Time::now(), occupancy_map_msg);
+  wavemap::convert::mapToRosMsg(*occupancy_map_, planner_frame_, ros::Time::now(), occupancy_map_msg);
   occupancy_pub_.publish(occupancy_map_msg);
 
   // update hashed map
@@ -372,7 +377,7 @@ void Planner::updateMap(bool update_esdf) {
     esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
 
     wavemap_msgs::Map msg;
-    wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
+    wavemap::convert::mapToRosMsg(*esdf_, planner_frame_, ros::Time::now(), msg);
     esdf_pub_.publish(msg);
   }
 }
@@ -381,7 +386,7 @@ void Planner::updateMap(bool update_esdf) {
 void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
   LOG(INFO) << "Publishing trajectory";
   visualization_msgs::Marker trajectory_msg;
-  trajectory_msg.header.frame_id = world_frame_;
+  trajectory_msg.header.frame_id = planner_frame_;
   trajectory_msg.header.stamp = ros::Time::now();
   trajectory_msg.type = visualization_msgs::Marker::LINE_STRIP;
   trajectory_msg.action = visualization_msgs::Marker::ADD;
@@ -404,7 +409,7 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
 
     if (idx % 50 == 0) {
       visualization_msgs::Marker arrow;
-      arrow.header.frame_id = world_frame_;
+      arrow.header.frame_id = planner_frame_;
       arrow.header.stamp = ros::Time::now();
       arrow.ns = "trajectory";
       arrow.id = idx; // Use idx as the unique ID for each marker
@@ -453,7 +458,7 @@ void Planner::visualizeState(const Eigen::Vector3d& pos) const {
 
   // Set up the marker
   visualization_msgs::Marker marker;
-  marker.header.frame_id = world_frame_;
+  marker.header.frame_id = planner_frame_;
   marker.header.stamp = ros::Time::now();
   marker.id = 100;
   marker.type = visualization_msgs::Marker::SPHERE;
@@ -479,33 +484,43 @@ void Planner::goalCB() {
   ROS_INFO("goalCB");
   
   // get the new goal
-  auto plan_goal = get_path_action_srv_.acceptNewGoal();
+  auto plan_req = get_path_action_srv_.acceptNewGoal();
+  std::cout << "---------------- 1" << std::endl;
 
-  geometry_msgs::Pose start_pose = plan_goal->start_pose;
-  geometry_msgs::Pose goal_pose = plan_goal->goal_pose;
-  waverider_chomp_msgs::PlannerType planner_type = plan_goal->planner_type;
+  int n_elements = plan_req->path.path_segments.size();
+  navigation_msgs::PoseStamped start_pose = plan_req->path.path_segments[0].goal;
+  std::cout << "---------------- 1" << std::endl;
+  navigation_msgs::PoseStamped goal_pose = plan_req->path.path_segments[n_elements - 1].goal;
+  std::cout << "---------------- 3" << std::endl;
+  // // waverider_chomp_msgs::PlannerType planner_type = plan_req->planner_type; // TODO: ADD CHOICE IN MESSAGE OR WHEN STARTUP PLANNER?
+  waverider_chomp_msgs::PlannerType planner_type;
+  planner_type.type = waverider_chomp_msgs::PlannerType::CHOMP;
 
-  // update map to get newest data
-  // updateMap(planner_type == waverider_chomp_msgs::CHOMP);
+  std::cout << "---------------- start_pose: " << std::endl << start_pose << std::endl;
+  std::cout << "---------------- goal_pose: " << std::endl << goal_pose << std::endl;
 
-  // adapt robot height
-  height_robot_ = start_pose.position.z;
 
-  // TODO: check if start is collision free
-  double min_distance = distance_getter_(Eigen::Vector2d(start_pose.position.x, start_pose.position.y));
-  if (min_distance < kRobotRadius_) {
-    publishLocalPlannerFeedback(Feedback::INVALID_START);
-    return;
-  }
+  // // update map to get newest data
+  // // updateMap(planner_type == waverider_chomp_msgs::CHOMP);
 
-  // TODO: check if goal is collision free
-  min_distance = distance_getter_(Eigen::Vector2d(goal_pose.position.x, goal_pose.position.y));
-  if (min_distance < kRobotRadius_) {
-    publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
-    return;
-  }
+  // // adapt robot height
+  // height_robot_ = start_pose.position.z;
 
-  getTrajectory(start_pose, goal_pose, planner_type);
+  // // TODO: check if start is collision free
+  // double min_distance = distance_getter_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
+  // if (min_distance < kRobotRadius_) {
+  //   publishLocalPlannerFeedback(Feedback::INVALID_START);
+  //   return;
+  // }
+
+  // // TODO: check if goal is collision free
+  // min_distance = distance_getter_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
+  // if (min_distance < kRobotRadius_) {
+  //   publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
+  //   return;
+  // }
+
+  getTrajectory(start_pose.pose, goal_pose.pose, planner_type, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
 }
 
 void Planner::preemptCB() {

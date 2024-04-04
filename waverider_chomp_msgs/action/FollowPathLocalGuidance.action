@@ -1,0 +1,15 @@
+# goal definition
+navigation_msgs/PathLocalGuidance path
+---
+# result definition
+---
+# feedback definition
+uint16 remaining_number_of_segments
+uint16 initial_number_of_segments
+int16 id_last_followed_segment
+int16 id_currently_followed_segment
+float32 remaining_distance
+float32 initial_distance
+float32 estimated_time_left # estimated time left before end of the path [s]
+string local_guidance_mode
+string status

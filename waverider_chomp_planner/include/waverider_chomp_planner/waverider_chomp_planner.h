@@ -29,12 +29,18 @@
 
 #include <actionlib/server/simple_action_server.h>
 #include <waverider_chomp_msgs/PlanToGoalPlannerAction.h>
+#include <waverider_chomp_msgs/PlanToGoalLocalGuidanceAction.h>
+#include <waverider_chomp_msgs/FollowPathLocalGuidanceAction.h>
+#include <navigation_msgs/PathSegmentLocalGuidance.h>
+#include <navigation_msgs/PoseStamped.h>
+#include <navigation_msgs/Tolerance.h>
 
+// TOOD: IF NO CHANGES ACTIONS - CAN ALSO USE THE ONE FROM NAVIGATION
 
 namespace waverider_chomp_planner {
 
-using PlanningActionServer = actionlib::SimpleActionServer<waverider_chomp_msgs::PlanToGoalPlannerAction>;
-using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalPlannerFeedbackPtr;
+using PlanningActionServer = actionlib::SimpleActionServer<waverider_chomp_msgs::PlanToGoalLocalGuidanceAction>;
+using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalLocalGuidanceFeedbackPtr;
 
 using Feedback = PlanningActionServer::Feedback;
 using FeedbackStatus = Feedback::_status_local_planner_type;
@@ -53,7 +59,11 @@ public:
 
   void getTrajectory(const geometry_msgs::Pose& start,
                      const geometry_msgs::Pose& goal,
-                     const waverider_chomp_msgs::PlannerType& planner_type);
+                     const waverider_chomp_msgs::PlannerType& planner_type,
+                     const bool ignore_orientation,
+                     const navigation_msgs::Tolerance tol,
+                     const std::string local_guidance_mode);
+
   Eigen::MatrixXd getChompTrajectory(const geometry_msgs::Pose& start,
                                      const geometry_msgs::Pose& goal);
   Eigen::MatrixXd getWaveriderTrajectory(const geometry_msgs::Pose& start,
@@ -73,7 +83,7 @@ private:
   // action stuff
   PlanningActionServer get_path_action_srv_;
   // Feedback planning_feedback_;
-  PlanningFeedbackPtr feedback_{new waverider_chomp_msgs::PlanToGoalPlannerFeedback()};
+  PlanningFeedbackPtr feedback_{new waverider_chomp_msgs::PlanToGoalLocalGuidanceFeedback()};
 
   // ROS members
   ros::NodeHandle nh_;
@@ -100,7 +110,7 @@ private:
   std::function<float(const Eigen::Vector2d&)> distance_getter_;
 
   // robot
-  const std::string world_frame_ = "odom";
+  const std::string planner_frame_ = "odom";
   double height_robot_ = 0.65; // TODO: get from start
   const double des_lin_velocity_ = 0.1; // TODO: CHECK WHAT THIS SHOULD BE
   const double des_ang_velocity_ = 0.2;

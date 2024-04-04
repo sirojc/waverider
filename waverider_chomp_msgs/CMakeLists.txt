@@ -19,6 +19,7 @@ add_action_files(
   DIRECTORY
     action
   FILES
+    FollowPathLocalGuidance.action
     PlanToGoalLocalGuidance.action
     PlanToGoalPlanner.action
 )
