@@ -6,9 +6,15 @@
   <arg name="debug_mode"
        default="false"
        doc="Run the mapper in a debugger (gdb)."/>
+  <arg name="load_map_from_file"
+       default="false"
+       doc="Load the map from a file."/>
+  <arg name="frame"
+       default="false"
+       doc="Which frame to use for planning/ mapping."/>
        
   <!-- Run the wavemap server -->
-  <group>
+  <group unless="$(arg load_map_from_file)">
     <arg if="$(arg debug_mode)" name="launch_prefix"
          value="gdb -ex run --args"/>
     <arg unless="$(arg debug_mode)" name="launch_prefix" value=""/>
@@ -21,9 +27,11 @@
   </group>
 
   <!-- Run the waverider server -->
-  <node name="waverider_chomp_planner" pkg="waverider_chomp_planner"
-        type="waverider_chomp_planner_node"
-        output="screen">
-  </node>
+<node name="waverider_chomp_planner" pkg="waverider_chomp_planner"
+     type="waverider_chomp_planner_node"
+     output="screen">
+     <param name="load_map_from_file" value="$(arg load_map_from_file)"/>
+     <param name="frame" value="$(arg frame)"/>
+</node>
 
 </launch>

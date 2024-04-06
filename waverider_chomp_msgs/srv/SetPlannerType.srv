@@ -1,0 +1,5 @@
+waverider_chomp_msgs/PlannerType planner_type
+
+---
+
+bool success

@@ -21,6 +21,7 @@
 #include "nav_msgs/Path.h"
 #include <waverider_chomp_msgs/GetTraj.h>
 #include <waverider_chomp_msgs/PlannerType.h>
+#include <mav_reactive_planning/PolicyValue.h>
 #include <waverider_ros/policy_visuals.h>
 #include <waverider/waverider_policy.h>
 #include <rmpcpp/policies/simple_target_policy.h>
@@ -40,6 +41,7 @@ public:
                                 const geometry_msgs::Pose goal) const;
 
   void updateMap(const wavemap::VolumetricDataStructureBase::Ptr map);
+  void updateWaveriderPolicy(const mav_reactive_planning::PolicyValue policy);
 
   void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
   void visualizeState(const Eigen::Vector3d& pos) const;
@@ -66,6 +68,7 @@ private:
   ros::Publisher trajectory_pub_arrows_;
 
   ros::Subscriber map_sub_;
+  // ros::Subscriber waverider_policy_sub_;
 
   //wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
@@ -94,6 +97,7 @@ private:
   // double flat_res_radius_ = 0.0;
   double flat_res_radius_ = 1.0;
   size_t max_integration_steps_{10000};
+  mav_reactive_planning::PolicyValue waverider_policy_;
 
 };
 

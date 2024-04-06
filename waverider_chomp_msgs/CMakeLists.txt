@@ -19,14 +19,13 @@ add_action_files(
   DIRECTORY
     action
   FILES
-    FollowPathLocalGuidance.action
     PlanToGoalLocalGuidance.action
-    PlanToGoalPlanner.action
 )
 
 add_service_files(
     FILES
         GetTraj.srv
+        SetPlannerType.srv
 )
 
 add_message_files(

@@ -13,6 +13,8 @@ PlannerInterface::PlannerInterface(ros::NodeHandle nh, ros::NodeHandle nh_privat
   state_pub_ = nh.advertise<visualization_msgs::Marker>("rmp_state", 10, true);
   trajectory_pub_ = nh.advertise<visualization_msgs::Marker>("trajectory", 10, true);
   trajectory_pub_arrows_ = nh.advertise<visualization_msgs::MarkerArray>("trajectory_arrows", 10, true);
+
+  // waverider_policy_sub_ = nh.subscribe("/waverider_server/planner/policy", 1, &PlannerInterface::updateWaveriderPolicy, this);
   
   // TODO: MAKE MAP UPDATE AND NOT FROM FILE, CHECK WAVERIDER HOW THEY DO IT
   // Load the occupancy map
@@ -142,6 +144,11 @@ void PlannerInterface::updateMap(const wavemap::VolumetricDataStructureBase::Ptr
   wavemap::convert::mapToRosMsg(*esdf_, world_frame_, ros::Time::now(), msg);
   esdf_pub_.publish(msg);
 }
+
+// void PlannerInterface::updateWaveriderPolicy(const mav_reactive_planning::PolicyValue policy) {
+//   ROS_INFO_ONCE("Received first waverider policy");
+//   waverider_policy_ = policy;
+// }
 
 void PlannerInterface::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
   LOG(INFO) << "Publishing trajectory";
