@@ -408,9 +408,20 @@ void Planner::updateMap(bool update_esdf) {
   if (update_esdf) {
     esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
 
+    // distance_getter_esdf_ = [this](const Eigen::Vector2d& position_d) {
+    //   const wavemap::Point3D position(position_d[0], position_d[1], this->height_robot_);
+    //   return wavemap::interpolateTrilinear(*this->esdf_, position);
+    //   // if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold_) { // TODO: I think this checks whether or not within map?
+    //   //     return wavemap::interpolateTrilinear(*this->esdf_, position);
+    //   // } else {
+    //   //     return 0.f;
+    //   // }
+    // };
+
     std::cout << "---------------- updateMap 3" << std::endl;
     params_.map_resolution =(*esdf_).getMinCellWidth();
     chomp_.setParameters(params_);
+    // chomp_.setDistanceFunction(distance_getter_esdf_);
   }
 }
 
@@ -437,6 +448,7 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
   trajectory_msg.scale.y = kRobotRadius_;
   trajectory_msg.scale.z = kRobotRadius_;
   trajectory_msg.color.r = 1.0;
+  trajectory_msg.color.b = 1.0;
   trajectory_msg.color.a = 0.5;
   trajectory_msg.pose.orientation.w = 1.0;
 
@@ -448,7 +460,7 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
     position_msg.y = trajectory(idx, 1);
     position_msg.z = trajectory(idx, 2);
 
-    if (idx % 50 == 0) {
+    if (idx % 100 == 0) {
       visualization_msgs::Marker arrow;
       arrow.header.frame_id = planner_frame_;
       arrow.header.stamp = ros::Time::now();
@@ -461,6 +473,7 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
       arrow.scale.z = 0.3; // Head length
       arrow.color.b = 1.0;
       arrow.color.g = 1.0;
+      arrow.color.a = 0.5;
 
       // the position of the arrow
       arrow.pose.position.x = trajectory(idx, 0);
@@ -549,21 +562,33 @@ void Planner::goalCB() {
   double min_distance_start = 0;
   double min_distance_goal = 0;
   if (planner_type.type == waverider_chomp_msgs::PlannerType::CHOMP) {
+    std::cout << "getting distances from esdf" << std::endl;
     min_distance_start = distance_getter_esdf_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
     min_distance_goal = distance_getter_esdf_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
   } else {
+    std::cout << "getting distances from occupancy map" << std::endl;
     min_distance_start = distance_getter_occ_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
     min_distance_goal = distance_getter_occ_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
   }
 
+
+  std::cout << "min_distance_start: " << min_distance_start << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
+  std::cout << "min_distance_goal: " << min_distance_goal << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
+  // double min_distance_start_occ = distance_getter_occ_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
+  // double min_distance_goal_occ = distance_getter_occ_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
+  // std::cout << "min_distance_start_occ: " << min_distance_start_occ << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
+  // std::cout << "min_distance_goal_occ: " << min_distance_goal_occ << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
+
   if (min_distance_start < kRobotRadius_) {
     publishLocalPlannerFeedback(Feedback::INVALID_START);
     ROS_INFO("Not planning, start pose invalid");
+    std::cout << "min_distance_start: " << min_distance_start << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
     return;
   }
   if (min_distance_goal < kRobotRadius_) {
     publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
     ROS_INFO("Not planning, goal pose invalid");
+    std::cout << "min_distance_goal: " << min_distance_goal << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
     return;
   }
 

@@ -1,30 +1,29 @@
 <launch>
   <!-- General arguments -->
   <arg name="param_file"
-       default="$(find wavemap_ros)/config/alma.yaml"
+       default="$(find wavemap_ros)/config/alma_hashed_wavelet_adaptive.yaml"
        doc="Name of the file from which to read wavemap's server params."/>
   <arg name="debug_mode"
        default="false"
        doc="Run the mapper in a debugger (gdb)."/>
+  <arg name="show_rviz"
+       default="false"
+       doc="Automatically launch Rviz."/>
+
   <arg name="load_map_from_file"
        default="false"
        doc="Load the map from a file."/>
   <arg name="frame"
-       default="false"
+       default="map"
        doc="Which frame to use for planning/ mapping."/>
        
   <!-- Run the wavemap server -->
-  <group unless="$(arg load_map_from_file)">
-    <arg if="$(arg debug_mode)" name="launch_prefix"
-         value="gdb -ex run --args"/>
-    <arg unless="$(arg debug_mode)" name="launch_prefix" value=""/>
-
-    <node name="wavemap" pkg="wavemap_ros"
-          type="wavemap_server_node"
-          launch-prefix="$(arg launch_prefix)">
-      <rosparam file="$(arg param_file)"/>
-    </node>
-  </group>
+  <include file="$(find wavemap_ros)/launch/wavemap_server.launch" unless="$(arg load_map_from_file)">
+     <arg name="param_file" value="$(arg param_file)"/>
+     <arg name="debug_mode" value="$(arg debug_mode)"/>
+     <arg name="show_rviz" value="$(arg show_rviz)"/>
+  </include>
+  
 
   <!-- Run the waverider server -->
 <node name="waverider_chomp_planner" pkg="waverider_chomp_planner"

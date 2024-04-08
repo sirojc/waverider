@@ -103,7 +103,7 @@ private:
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
   wavemap::HashedWaveletOctree::Ptr hashed_map_;
   const float kOccupancyThreshold_ = -0.1f;
-  const float kMaxDistance_ = 2.f;
+  const float kMaxDistance_ = 4.f;
   wavemap::HashedBlocks::Ptr esdf_;
   const float kRobotRadius_ = 0.5f;
   const float kSafetyPadding_ = 0.1f;
