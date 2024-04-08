@@ -183,7 +183,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
     publishLocalPlannerFeedback(Feedback::FOUND_SOLUTION);
   
     // get the full trajectory
-    Eigen::MatrixXd full_traj = get_full_traj(traj, start, goal);
+    Eigen::MatrixXd full_traj = getFullTraj(traj, start, goal);
 
     // visualization marker
     visualizeTrajectory(full_traj);
@@ -332,34 +332,58 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
 
 // todo: CHECK IF START IS PART OF TRAJECTORY OR NOT - HANDLE ACCORDINGLY
 // TODO: implement this better (include z, roll, pitch for start? To start from current configuration?)
-Eigen::MatrixXd Planner::get_full_traj(const Eigen::MatrixXd chomp_traj, const geometry_msgs::Pose start,
-                                            const geometry_msgs::Pose goal) const {
-  int n_elements = chomp_traj.rows();
+Eigen::MatrixXd Planner::getFullTraj(const Eigen::MatrixXd chomp_traj, const geometry_msgs::Pose start,
+                                     const geometry_msgs::Pose goal) const {
+  int n_elements = chomp_traj.rows() + 1; // add goal
 
   // x, y given through trajectory
+  Eigen::MatrixXd x_y_pos(n_elements, 2);
+  x_y_pos << chomp_traj,
+             Eigen::Vector2d(goal.position.x, goal.position.y).transpose();
 
   // calculate z for each step
-  Eigen::MatrixXd z_pos = Eigen::MatrixXd::Ones(n_elements, 1) * height_robot_;
+  Eigen::MatrixXd z_pos(n_elements, 1);
+  z_pos << Eigen::MatrixXd::Ones(n_elements - 1, 1) * height_robot_,
+           goal.position.z;
+
+
+  Eigen::Quaterniond q_goal(goal.orientation.w, goal.orientation.x, goal.orientation.y, goal.orientation.z);
+  Eigen::Vector3d euler_angles_goal = q_goal.toRotationMatrix().eulerAngles(0, 1, 2); // XYZ order
 
   // calculate roll, pitch for each step
-  // TODO: CHECK IF NORMAL ANYMAL CONFIGURATION ROLL = 0 AND PITCH = 0 (with simulation)
-  Eigen::MatrixXd roll = Eigen::MatrixXd::Zero(n_elements, 1);
-  Eigen::MatrixXd pitch = Eigen::MatrixXd::Zero(n_elements, 1);
+  Eigen::MatrixXd roll(n_elements, 1);
+  roll << Eigen::MatrixXd::Zero(n_elements - 1, 1),
+          euler_angles_goal[0];
+
+  
+  Eigen::MatrixXd pitch(n_elements, 1);
+  pitch << Eigen::MatrixXd::Zero(n_elements - 1, 1),
+           euler_angles_goal[1];
 
   // calculate yaw for each step
   Eigen::MatrixXd yaw_angle = Eigen::MatrixXd::Zero(n_elements, 1);
-  for (int i = 0; i < chomp_traj.rows() - 1; ++i) {
-      double diff_x = chomp_traj(i + 1, 0) - chomp_traj(i, 0);
-      double diff_y = chomp_traj(i + 1, 1) - chomp_traj(i, 1);
-      
+  double diff_x = 0;
+  double diff_y = 0;
+  for (int i = 0; i < chomp_traj.rows(); ++i) {
+    if(i < chomp_traj.rows() - 1) {
+      diff_x = chomp_traj(i + 1, 0) - chomp_traj(i, 0);
+      diff_y = chomp_traj(i + 1, 1) - chomp_traj(i, 1);
+    } else {
+      diff_x = goal.position.x - chomp_traj(i, 0);
+      diff_y = goal.position.y - chomp_traj(i, 1);
+    }
       yaw_angle(i) = atan2(diff_y, diff_x);
   }
-  Eigen::Quaterniond q_goal(goal.orientation.w, goal.orientation.x, goal.orientation.y, goal.orientation.z);
-  Eigen::Vector3d euler_angles_goal = q_goal.toRotationMatrix().eulerAngles(0, 1, 2); // XYZ order
   yaw_angle(n_elements - 1) = euler_angles_goal[2];
 
+  CHECK_EQ(x_y_pos.rows(), n_elements);
+  CHECK_EQ(z_pos.rows(), n_elements);
+  CHECK_EQ(roll.rows(), n_elements);
+  CHECK_EQ(pitch.rows(), n_elements);
+  CHECK_EQ(yaw_angle.rows(), n_elements);
+  
   Eigen::MatrixXd full_traj(n_elements, 6);
-  full_traj << chomp_traj, z_pos, roll, pitch, yaw_angle;
+  full_traj << x_y_pos, z_pos, roll, pitch, yaw_angle;
 
   CHECK_EQ(full_traj.cols(), 6);
 
@@ -505,10 +529,13 @@ void Planner::goalCB() {
 
   int n_elements = plan_req->path.path_segments.size();
   navigation_msgs::PoseStamped start_pose = plan_req->path.path_segments[0].goal;
-  navigation_msgs::PoseStamped goal_pose = plan_req->path.path_segments[n_elements - 1].goal;
+  navigation_msgs::PoseStamped goal_pose = plan_req->path.path_segments.back().goal;
   // // waverider_chomp_msgs::PlannerType planner_type = plan_req->planner_type; // TODO: ADD CHOICE IN MESSAGE OR WHEN STARTUP PLANNER?
   waverider_chomp_msgs::PlannerType planner_type;
   planner_type.type = waverider_chomp_msgs::PlannerType::CHOMP;
+
+  std::cout << "---------------- start_pose: " << std::endl << start_pose << std::endl;
+  std::cout << "---------------- goal_pose: " << std::endl << goal_pose << std::endl;
 
   // update map to get newest data
   if (!load_map_from_file_) {

@@ -66,9 +66,9 @@ public:
   Eigen::MatrixXd getWaveriderTrajectory(const geometry_msgs::Pose& start,
                                          const geometry_msgs::Pose& goal);
 
-  Eigen::MatrixXd get_full_traj(const Eigen::MatrixXd chomp_traj,
-                                const geometry_msgs::Pose start,
-                                const geometry_msgs::Pose goal) const;
+  Eigen::MatrixXd getFullTraj(const Eigen::MatrixXd chomp_traj,
+                              const geometry_msgs::Pose start,
+                              const geometry_msgs::Pose goal) const;
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
   void updateMap(bool update_esdf);
