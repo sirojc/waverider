@@ -28,6 +28,9 @@
 
 #include <waverider_chomp_msgs/SetPlannerType.h>
 
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_ros/transform_listener.h>
+
 #include <actionlib/server/simple_action_server.h>
 #include <waverider_chomp_msgs/PlanToGoalLocalGuidanceAction.h>
 #include <navigation_msgs/FollowPathLocalGuidanceAction.h>
@@ -44,7 +47,7 @@ using FeedbackStatus = Feedback::_status_local_planner_type;
 
 class Planner {
 public:
-  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_from_file, std::string frame);
+  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_from_file, std::string frame, float propagation_distance);
 
   void processActionServerGoals(ros::AsyncSpinner& spinner);
   void goalCB();
@@ -56,7 +59,6 @@ public:
 
   void getTrajectory(const geometry_msgs::Pose& start,
                      const geometry_msgs::Pose& goal,
-                     const waverider_chomp_msgs::PlannerType& planner_type,
                      const bool ignore_orientation,
                      const navigation_msgs::Tolerance tol,
                      const std::string local_guidance_mode);
@@ -99,11 +101,14 @@ private:
 
   ros::ServiceServer set_planner_type_server_;
 
+  tf2_ros::Buffer tf_buffer_;
+  tf2_ros::TransformListener tf_listener_{tf_buffer_};
+
   // wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
   wavemap::HashedWaveletOctree::Ptr hashed_map_;
   const float kOccupancyThreshold_ = -0.1f;
-  const float kMaxDistance_ = 4.f;
+  float kMaxDistance_ = 5.f;
   wavemap::HashedBlocks::Ptr esdf_;
   const float kRobotRadius_ = 0.5f;
   const float kSafetyPadding_ = 0.1f;

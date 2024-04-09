@@ -14,6 +14,10 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
 
   <depend>roscpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>navigation_common</depend>
   <depend>waverider</depend>
   <depend>waverider_chomp_msgs</depend>
   <depend>waverider_ros</depend>

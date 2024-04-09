@@ -16,6 +16,9 @@
   <arg name="frame"
        default="map"
        doc="Which frame to use for planning/ mapping."/>
+  <arg name="propagation_distance"
+       default="5.0"
+       doc="Automatically launch Rviz."/>
        
   <!-- Run the wavemap server -->
   <include file="$(find wavemap_ros)/launch/wavemap_server.launch" unless="$(arg load_map_from_file)">
@@ -31,6 +34,7 @@
      output="screen">
      <param name="load_map_from_file" value="$(arg load_map_from_file)"/>
      <param name="frame" value="$(arg frame)"/>
+     <param name="propagation_distance" value="$(arg propagation_distance)"/>
 </node>
 
 </launch>

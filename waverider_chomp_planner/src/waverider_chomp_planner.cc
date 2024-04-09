@@ -4,9 +4,9 @@
 
 namespace waverider_chomp_planner {
 
-Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_from_file, std::string frame)
+Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_from_file, std::string frame, float propagation_distance)
   : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_chomp_planner/plan_path", false),
-  load_map_from_file_(load_map_from_file), planner_frame_(frame) {
+  load_map_from_file_(load_map_from_file), planner_frame_(frame), kMaxDistance_(propagation_distance) {
   //register the goal and feeback callbacks
   get_path_action_srv_.registerGoalCallback(boost::bind(&Planner::goalCB, this));
   get_path_action_srv_.registerPreemptCallback(boost::bind(&Planner::preemptCB, this));
@@ -34,7 +34,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
 
     // Publish the occupancy map
     wavemap_msgs::Map occupancy_map_msg;
-    wavemap::convert::mapToRosMsg(*occupancy_map_, planner_frame_, ros::Time::now(),
+    wavemap::convert::mapToRosMsg(*occupancy_map_, "map", ros::Time::now(),
                                   occupancy_map_msg);
     occupancy_pub_.publish(occupancy_map_msg);
 
@@ -49,7 +49,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
 
     // Publish the ESDF
     wavemap_msgs::Map msg;
-    wavemap::convert::mapToRosMsg(*esdf_, planner_frame_, ros::Time::now(), msg);
+    wavemap::convert::mapToRosMsg(*esdf_, "map", ros::Time::now(), msg);
     esdf_pub_.publish(msg);
   }
 
@@ -111,7 +111,6 @@ bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
 
 void Planner::getTrajectory(const geometry_msgs::Pose& start,
                             const geometry_msgs::Pose& goal,
-                            const waverider_chomp_msgs::PlannerType& planner_type,
                             const bool ignore_orientation,
                             const navigation_msgs::Tolerance tol,
                             const std::string local_guidance_mode) {
@@ -121,7 +120,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
   {
     // Set up the marker
     visualization_msgs::Marker marker;
-    marker.header.frame_id = planner_frame_;
+    marker.header.frame_id = "map";
     marker.header.stamp = ros::Time::now();
     marker.id = 100;
     marker.type = visualization_msgs::Marker::SPHERE;
@@ -163,9 +162,9 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
   
   Eigen::MatrixXd traj;
   
-  if (planner_type.type == waverider_chomp_msgs::PlannerType::CHOMP) {
+  if (planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP) {
      traj = getChompTrajectory(start, goal);
-  } else if (planner_type.type == waverider_chomp_msgs::PlannerType::WAVERIDER) {
+  } else if (planner_type_.type == waverider_chomp_msgs::PlannerType::WAVERIDER) {
     traj = getWaveriderTrajectory(start, goal);
   } else {
     ROS_ERROR("Unknown planner type");
@@ -195,7 +194,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
     // Set values that are the same for all.
     segment.goal.tol = tol;
     segment.goal.ignore_orientation = ignore_orientation;
-    segment.goal.header.frame_id = planner_frame_;
+    segment.goal.header.frame_id = "map";
     segment.goal.header.stamp = ros::Time::now();
     segment.local_guidance_mode = local_guidance_mode;
     optimized_path.header = segment.goal.header;
@@ -221,6 +220,28 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
       traj_step.orientation.y = q_curr.y();
       traj_step.orientation.z = q_curr.z();
       traj_step.orientation.w = q_curr.w();
+
+        if (planner_frame_ != "map") {
+          ROS_INFO("transforming traj. pose to planner_frame %s", planner_frame_.c_str());
+          geometry_msgs::PoseStamped traj_pose_stamped;
+          traj_pose_stamped.header.stamp = ros::Time::now();
+          traj_pose_stamped.header.frame_id = planner_frame_;
+          traj_pose_stamped.pose = traj_step;
+
+          geometry_msgs::TransformStamped transformStamped;
+          try{
+            transformStamped = tf_buffer_.lookupTransform(traj_pose_stamped.header.frame_id, "map", ros::Time(0));
+            }
+          catch (tf2::TransformException &ex) {
+            ROS_ERROR("%s",ex.what());
+            publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
+            return;
+          }
+
+          tf2::doTransform(traj_pose_stamped, traj_pose_stamped, transformStamped);
+
+          traj_step = traj_pose_stamped.pose;
+        }
 
       segment.goal.pose = traj_step;
       optimized_path.path_segments.push_back(segment);
@@ -295,7 +316,7 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
      
       // visualization
       visualization_msgs::MarkerArray marker_array;
-      waverider::addFilteredObstaclesToMarkerArray(waverider_policy.getObstacleCells(), planner_frame_, marker_array);
+      waverider::addFilteredObstaclesToMarkerArray(waverider_policy.getObstacleCells(), "map", marker_array);
       // waverider_map_pub_.publish(marker_array);
 
       last_updated_pos = state.pos_;
@@ -438,7 +459,7 @@ bool Planner::setPlannerTypeService(waverider_chomp_msgs::SetPlannerType::Reques
 void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
   LOG(INFO) << "Publishing trajectory";
   visualization_msgs::Marker trajectory_msg;
-  trajectory_msg.header.frame_id = planner_frame_;
+  trajectory_msg.header.frame_id = "map";
   trajectory_msg.header.stamp = ros::Time::now();
   trajectory_msg.type = visualization_msgs::Marker::LINE_STRIP;
   trajectory_msg.action = visualization_msgs::Marker::ADD;
@@ -462,7 +483,7 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
 
     if (idx % 100 == 0) {
       visualization_msgs::Marker arrow;
-      arrow.header.frame_id = planner_frame_;
+      arrow.header.frame_id = "map";
       arrow.header.stamp = ros::Time::now();
       arrow.ns = "trajectory";
       arrow.id = idx; // Use idx as the unique ID for each marker
@@ -511,7 +532,7 @@ void Planner::visualizeState(const Eigen::Vector3d& pos) const {
 
   // Set up the marker
   visualization_msgs::Marker marker;
-  marker.header.frame_id = planner_frame_;
+  marker.header.frame_id = "map";
   marker.header.stamp = ros::Time::now();
   marker.id = 100;
   marker.type = visualization_msgs::Marker::SPHERE;
@@ -543,16 +564,58 @@ void Planner::goalCB() {
   int n_elements = plan_req->path.path_segments.size();
   navigation_msgs::PoseStamped start_pose = plan_req->path.path_segments[0].goal;
   navigation_msgs::PoseStamped goal_pose = plan_req->path.path_segments.back().goal;
-  // // waverider_chomp_msgs::PlannerType planner_type = plan_req->planner_type; // TODO: ADD CHOICE IN MESSAGE OR WHEN STARTUP PLANNER?
-  waverider_chomp_msgs::PlannerType planner_type;
-  planner_type.type = waverider_chomp_msgs::PlannerType::CHOMP;
+
+  // check frame, convert start pose to map frame (map might drift w.r.t start).
+  if (start_pose.header.frame_id != "map") {
+      ROS_INFO("transforming start to map frame");
+      geometry_msgs::PoseStamped start_pose_stamped;
+      start_pose_stamped.header = start_pose.header;
+      start_pose_stamped.pose = start_pose.pose;
+
+      geometry_msgs::TransformStamped transformStamped;
+      try{
+        transformStamped = tf_buffer_.lookupTransform(start_pose_stamped.header.frame_id, "map", ros::Time(0));
+        }
+      catch (tf2::TransformException &ex) {
+        ROS_ERROR("%s",ex.what());
+        publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
+        return;
+      }
+
+      tf2::doTransform(start_pose_stamped, start_pose_stamped, transformStamped);
+
+      start_pose.header = start_pose_stamped.header;
+      start_pose.pose = start_pose_stamped.pose;
+  }
+
+  if (goal_pose.header.frame_id != "map") {
+    ROS_INFO("transforming goal to map frame");
+    geometry_msgs::PoseStamped goal_pose_stamped;
+    goal_pose_stamped.header = goal_pose.header;
+    goal_pose_stamped.pose = goal_pose.pose;
+
+    geometry_msgs::TransformStamped transformStamped;
+    try{
+      transformStamped = tf_buffer_.lookupTransform(goal_pose_stamped.header.frame_id, "map", ros::Time(0));
+      }
+    catch (tf2::TransformException &ex) {
+      ROS_ERROR("%s",ex.what());
+      publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
+      return;
+    }
+
+    tf2::doTransform(goal_pose_stamped, goal_pose_stamped, transformStamped);
+
+    goal_pose.header = goal_pose_stamped.header;
+    goal_pose.pose = goal_pose_stamped.pose;
+  }
 
   std::cout << "---------------- start_pose: " << std::endl << start_pose << std::endl;
   std::cout << "---------------- goal_pose: " << std::endl << goal_pose << std::endl;
 
   // update map to get newest data
   if (!load_map_from_file_) {
-    updateMap(planner_type.type == waverider_chomp_msgs::PlannerType::CHOMP);
+    updateMap(planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP);
   }
 
   // adapt robot height
@@ -561,7 +624,7 @@ void Planner::goalCB() {
   // check if start and goal are collision free
   double min_distance_start = 0;
   double min_distance_goal = 0;
-  if (planner_type.type == waverider_chomp_msgs::PlannerType::CHOMP) {
+  if (planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP) {
     std::cout << "getting distances from esdf" << std::endl;
     min_distance_start = distance_getter_esdf_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
     min_distance_goal = distance_getter_esdf_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
@@ -592,7 +655,7 @@ void Planner::goalCB() {
     return;
   }
 
-  getTrajectory(start_pose.pose, goal_pose.pose, planner_type, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
+  getTrajectory(start_pose.pose, goal_pose.pose, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
 }
 
 void Planner::preemptCB() {
@@ -616,8 +679,13 @@ int main(int argc, char** argv)
 
   std::string frame;
   nh_private.getParam("frame", frame);
+  std::cout << "planner_frame: " << frame << std::endl;
 
-  waverider_chomp_planner::Planner planner(nh, nh_private, load_map_from_file, frame);
+  float propagation_distance;
+  nh_private.getParam("propagation_distance", propagation_distance);
+  std::cout << "propagation_distance: " << propagation_distance << std::endl;
+
+  waverider_chomp_planner::Planner planner(nh, nh_private, load_map_from_file, frame, propagation_distance);
   ros::spin();
 
   return 0;
