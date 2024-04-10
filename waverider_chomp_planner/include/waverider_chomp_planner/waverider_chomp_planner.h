@@ -17,6 +17,7 @@
 #include <wavemap_msgs/Map.h>
 #include <wavemap_ros_conversions/map_msg_conversions.h>
 #include <wavemap_ros/tf_transformer.h>
+#include <wavemap_ros/operations/crop_map_operation.h>
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_msgs/Path.h"
 #include <waverider_chomp_msgs/GetTraj.h>
@@ -73,12 +74,13 @@ public:
                               const geometry_msgs::Pose goal) const;
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
-  void updateMap(bool update_esdf);
+  void updateMap(const bool update_esdf, const wavemap::Point3D center_pose,
+                 const float distance);
 
   bool setPlannerTypeService(waverider_chomp_msgs::SetPlannerType::Request& req,
                              waverider_chomp_msgs::SetPlannerType::Response& res);
 
-  void visualizeTrajectory(const Eigen::MatrixXd& trajectory) const;
+  void visualizeTrajectory(const Eigen::MatrixXd& trajectory, bool is_collision_free) const;
   void visualizeState(const Eigen::Vector3d& pos) const;
 
 private:
@@ -91,6 +93,7 @@ private:
   ros::NodeHandle nh_private_;
 
   ros::Publisher occupancy_pub_;
+  ros::Publisher occupancy_cropped_pub_;
   ros::Publisher esdf_pub_;
   ros::Publisher waverider_map_pub_;
   ros::Publisher state_pub_;
@@ -106,15 +109,16 @@ private:
 
   // wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
-  wavemap::HashedWaveletOctree::Ptr hashed_map_;
+  wavemap::HashedWaveletOctree::Ptr hashed_map_cropped_;
   const float kOccupancyThreshold_ = -0.1f;
   float kMaxDistance_ = 5.f;
-  wavemap::HashedBlocks::Ptr esdf_;
+  wavemap::HashedBlocks::Ptr esdf_cropped_;
   const float kRobotRadius_ = 0.5f;
   const float kSafetyPadding_ = 0.1f;
   const float paddedRobotRadius_ = kRobotRadius_ + kSafetyPadding_;
   std::function<float(const Eigen::Vector2d&)> distance_getter_esdf_;
-  std::function<float(const Eigen::Vector2d&)> distance_getter_occ_;
+  wavemap::CropMapOperation crop_map_operator_;
+  
 
   // robot
   const std::string planner_frame_ = "map";
@@ -136,6 +140,9 @@ private:
   // double flat_res_radius_ = 0.0;
   double flat_res_radius_ = 1.0;
   size_t max_integration_steps_{10000};
+
+  // other stuff
+  bool planning_;
 };
 
 }  //  waverider_chomp_planner

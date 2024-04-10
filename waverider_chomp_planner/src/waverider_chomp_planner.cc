@@ -6,7 +6,7 @@ namespace waverider_chomp_planner {
 
 Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_from_file, std::string frame, float propagation_distance)
   : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_chomp_planner/plan_path", false),
-  load_map_from_file_(load_map_from_file), planner_frame_(frame), kMaxDistance_(propagation_distance) {
+  load_map_from_file_(load_map_from_file), crop_map_operator_(), planner_frame_(frame), kMaxDistance_(propagation_distance), planning_(false) {
   //register the goal and feeback callbacks
   get_path_action_srv_.registerGoalCallback(boost::bind(&Planner::goalCB, this));
   get_path_action_srv_.registerPreemptCallback(boost::bind(&Planner::preemptCB, this));
@@ -15,6 +15,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
 
   // ros members
   occupancy_pub_ = nh.advertise<wavemap_msgs::Map>("waverider_chomp_planner/map", 10, true);
+  occupancy_cropped_pub_ = nh.advertise<wavemap_msgs::Map>("waverider_chomp_planner/map_cropped", 10, true);
   esdf_pub_ = nh.advertise<wavemap_msgs::Map>("waverider_chomp_planner/esdf", 10, true);
   waverider_map_pub_ = nh_private.advertise<visualization_msgs::MarkerArray>("waverider_chomp_planner/filtered_obstacles", 1);
   state_pub_ = nh.advertise<visualization_msgs::Marker>("waverider_chomp_planner/rmp_state", 10, true);
@@ -24,6 +25,9 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
   map_sub_ = nh_.subscribe("/wavemap/map", 1, &Planner::callbackMap, this);
 
   set_planner_type_server_ = nh_private_.advertiseService("waverider_chomp_planner/set_planner_type", &Planner::setPlannerTypeService, this);
+
+  // Initialize planner type with chomp
+  planner_type_.type = waverider_chomp_msgs::PlannerType::CHOMP;
 
   if (load_map_from_file) {
     ROS_INFO("loading map from file");
@@ -37,44 +41,19 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
     wavemap::convert::mapToRosMsg(*occupancy_map_, "map", ros::Time::now(),
                                   occupancy_map_msg);
     occupancy_pub_.publish(occupancy_map_msg);
-
-    // Currently, only hashed wavelet octree maps are supported as input
-    hashed_map_ = std::dynamic_pointer_cast<wavemap::HashedWaveletOctree>(occupancy_map_);
-    if (!hashed_map_) {
-      ROS_ERROR("Failed to cast occupancy map to HashedWaveletOctree.");
-    }
-
-    // Generate the ESDF
-    esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
-
-    // Publish the ESDF
-    wavemap_msgs::Map msg;
-    wavemap::convert::mapToRosMsg(*esdf_, "map", ros::Time::now(), msg);
-    esdf_pub_.publish(msg);
   }
 
   // Define the distance getter
   distance_getter_esdf_ = [this](const Eigen::Vector2d& position_d) {
     const wavemap::Point3D position(position_d[0], position_d[1], this->height_robot_);
-    return wavemap::interpolateTrilinear(*this->esdf_, position);
+    return wavemap::interpolateTrilinear(*this->esdf_cropped_, position);
     // if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold_) { // TODO: I think this checks whether or not within map?
-    //     return wavemap::interpolateTrilinear(*this->esdf_, position);
-    // } else {
-    //     return 0.f;
-    // }
-  };
-  distance_getter_occ_ = [this](const Eigen::Vector2d& position_d) {
-    const wavemap::Point3D position(position_d[0], position_d[1], this->height_robot_);
-    return wavemap::interpolateTrilinear(*this->occupancy_map_, position);
-    // if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold_) {
-    //     return wavemap::interpolateTrilinear(*this->esdf_, position);
+    //     return wavemap::interpolateTrilinear(*this->esdf_cropped_, position);
     // } else {
     //     return 0.f;
     // }
   };
 
-  // Initialize planner type with chomp
-  planner_type_.type = waverider_chomp_msgs::PlannerType::CHOMP;
 
   // Initialize CHOMP
   params_.w_collision = 10.0;
@@ -98,11 +77,18 @@ bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
   bool is_collision_free = true;
   for (int idx = 0; idx < trajectory.rows(); ++idx) {
     const auto position = trajectory.row(idx);
-    const float esdf_distance = distance_getter_esdf_(position);
-    if (esdf_distance <= kRobotRadius_) {
-      std::cout << "Collision at position: " << position << " with distance: " << esdf_distance << std::endl;
-      is_collision_free = false;
-      break;
+    double min_distance = 0;
+    if (planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP) {
+      std::cout << "getting distances from esdf" << std::endl;
+      min_distance = distance_getter_esdf_(position);
+      if (min_distance <= kRobotRadius_) {
+        std::cout << "Collision at position: " << position << " with distance: " << min_distance << std::endl;
+        is_collision_free = false;
+        break;
+      } else {
+        // TODO: HOW TO CHECK HERE?
+        return true;
+      }
     }
   }
 
@@ -176,6 +162,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
   if (!is_collision_free) {
     LOG(INFO) << "Solution trajectory is NOT collision free";
     publishLocalPlannerFeedback(Feedback::NO_SOLUTION);
+    planning_ = false;
     return;
   } else {
     LOG(INFO) << "Solution trajectory is collision free";
@@ -185,7 +172,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
     Eigen::MatrixXd full_traj = getFullTraj(traj, start, goal);
 
     // visualization marker
-    visualizeTrajectory(full_traj);
+    visualizeTrajectory(full_traj, is_collision_free);
 
     // response trajectory
     navigation_msgs::PathLocalGuidance optimized_path;
@@ -235,6 +222,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
           catch (tf2::TransformException &ex) {
             ROS_ERROR("%s",ex.what());
             publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
+            planning_ = false;
             return;
           }
 
@@ -252,6 +240,7 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
     publishLocalPlannerFeedback(Feedback::PUBLISHED_SOLUTION);
   }
 
+  planning_ = false;
   return;
 }
 
@@ -312,7 +301,7 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
 
     // sum policies
     if((last_updated_pos - state.pos_).norm() > 0.1) {
-      waverider_policy.updateObstacles(*hashed_map_, state.pos_.cast<float>());
+      waverider_policy.updateObstacles(*hashed_map_cropped_, state.pos_.cast<float>());
      
       // visualization
       visualization_msgs::MarkerArray marker_array;
@@ -414,33 +403,43 @@ Eigen::MatrixXd Planner::getFullTraj(const Eigen::MatrixXd chomp_traj, const geo
 void Planner::callbackMap(const wavemap_msgs::Map::ConstPtr& msg) {
   ROS_INFO_ONCE("Received first map message.");
 
-  // convert map message to map
-  wavemap::VolumetricDataStructureBase::Ptr map;
-  wavemap::convert::rosMsgToMap(*msg, occupancy_map_);
+  if (!planning_) {
+    // convert map message to map
+    wavemap::VolumetricDataStructureBase::Ptr map;
+    wavemap::convert::rosMsgToMap(*msg, occupancy_map_);
+  }
 }
 
-void Planner::updateMap(bool update_esdf) {
+void Planner::updateMap(const bool update_esdf, const wavemap::Point3D center_pose, const float distance) {
+  // crop the occupancy map
+  crop_map_operator_.run(occupancy_map_, center_pose, distance);
+
+  // Publish the cropped occupancy map
+  wavemap_msgs::Map occupancy_map_msg;
+  wavemap::convert::mapToRosMsg(*occupancy_map_, "map", ros::Time::now(),
+                                occupancy_map_msg);
+  occupancy_cropped_pub_.publish(occupancy_map_msg);
+
   // update hashed map
-  hashed_map_ = std::dynamic_pointer_cast<wavemap::HashedWaveletOctree>(occupancy_map_);
-  if (!hashed_map_) {
+  hashed_map_cropped_ = std::dynamic_pointer_cast<wavemap::HashedWaveletOctree>(occupancy_map_);
+  if (!hashed_map_cropped_) {
     ROS_ERROR("Failed to cast occupancy map to HashedWaveletOctree.");
   }
 
   if (update_esdf) {
-    esdf_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_, kOccupancyThreshold_, kMaxDistance_));
+    esdf_cropped_ = std::make_shared<wavemap::HashedBlocks>(generateEsdf(*hashed_map_cropped_, kOccupancyThreshold_, kMaxDistance_));
 
     // distance_getter_esdf_ = [this](const Eigen::Vector2d& position_d) {
     //   const wavemap::Point3D position(position_d[0], position_d[1], this->height_robot_);
-    //   return wavemap::interpolateTrilinear(*this->esdf_, position);
+    //   return wavemap::interpolateTrilinear(*this->esdf_cropped_, position);
     //   // if (wavemap::interpolateTrilinear(*this->occupancy_map_, position) < kOccupancyThreshold_) { // TODO: I think this checks whether or not within map?
-    //   //     return wavemap::interpolateTrilinear(*this->esdf_, position);
+    //   //     return wavemap::interpolateTrilinear(*this->esdf_cropped_, position);
     //   // } else {
     //   //     return 0.f;
     //   // }
     // };
 
-    std::cout << "---------------- updateMap 3" << std::endl;
-    params_.map_resolution =(*esdf_).getMinCellWidth();
+    params_.map_resolution =(*esdf_cropped_).getMinCellWidth();
     chomp_.setParameters(params_);
     // chomp_.setDistanceFunction(distance_getter_esdf_);
   }
@@ -456,7 +455,7 @@ bool Planner::setPlannerTypeService(waverider_chomp_msgs::SetPlannerType::Reques
 }
 
 
-void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
+void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory, bool is_collision_free) const {
   LOG(INFO) << "Publishing trajectory";
   visualization_msgs::Marker trajectory_msg;
   trajectory_msg.header.frame_id = "map";
@@ -468,8 +467,12 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
   trajectory_msg.scale.x = kRobotRadius_;
   trajectory_msg.scale.y = kRobotRadius_;
   trajectory_msg.scale.z = kRobotRadius_;
-  trajectory_msg.color.r = 1.0;
-  trajectory_msg.color.b = 1.0;
+  if (is_collision_free) {
+    trajectory_msg.color.r = 0.2;
+    trajectory_msg.color.b = 1.0;
+  } else {
+    trajectory_msg.color.g = 1.0;
+  }
   trajectory_msg.color.a = 0.5;
   trajectory_msg.pose.orientation.w = 1.0;
 
@@ -481,7 +484,7 @@ void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory) const {
     position_msg.y = trajectory(idx, 1);
     position_msg.z = trajectory(idx, 2);
 
-    if (idx % 100 == 0) {
+    if (idx % 50 == 0) {
       visualization_msgs::Marker arrow;
       arrow.header.frame_id = "map";
       arrow.header.stamp = ros::Time::now();
@@ -559,6 +562,8 @@ void Planner::goalCB() {
   
   // get the new goal
   auto plan_req = get_path_action_srv_.acceptNewGoal();
+  planning_ = true;
+
   std::cout << "---------------- plan_req: " << std::endl << *plan_req << std::endl;
 
   int n_elements = plan_req->path.path_segments.size();
@@ -579,6 +584,7 @@ void Planner::goalCB() {
       catch (tf2::TransformException &ex) {
         ROS_ERROR("%s",ex.what());
         publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
+        planning_ = false;
         return;
       }
 
@@ -601,6 +607,7 @@ void Planner::goalCB() {
     catch (tf2::TransformException &ex) {
       ROS_ERROR("%s",ex.what());
       publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
+      planning_ = false;
       return;
     }
 
@@ -614,46 +621,43 @@ void Planner::goalCB() {
   std::cout << "---------------- goal_pose: " << std::endl << goal_pose << std::endl;
 
   // update map to get newest data
-  if (!load_map_from_file_) {
-    updateMap(planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP);
-  }
+  wavemap::Point3D center_point((start_pose.pose.position.x + goal_pose.pose.position.x) / 2.0,
+                                (start_pose.pose.position.y + goal_pose.pose.position.y) / 2.0,
+                                (start_pose.pose.position.z + goal_pose.pose.position.z) / 2.0);
+  wavemap::Point2D radius(start_pose.pose.position.x - center_point(0),
+                          start_pose.pose.position.y - center_point(1));
+  float distance = radius.norm() + 3;
+  std::cout << "--------- before updateMap" << std::endl;
+  updateMap(planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP, center_point, distance);
+  std::cout << "--------- after updateMap" << std::endl;
 
   // adapt robot height
   height_robot_ = start_pose.pose.position.z;
 
   // check if start and goal are collision free
-  double min_distance_start = 0;
-  double min_distance_goal = 0;
   if (planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP) {
-    std::cout << "getting distances from esdf" << std::endl;
-    min_distance_start = distance_getter_esdf_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
-    min_distance_goal = distance_getter_esdf_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
+    double min_distance_start =  distance_getter_esdf_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
+    if (min_distance_start < kRobotRadius_) {
+      publishLocalPlannerFeedback(Feedback::INVALID_START);
+      ROS_INFO("Not planning, start pose invalid");
+      std::cout << "min_distance_start: " << min_distance_start << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
+      planning_ = false;
+      return;
+    }
+
+    double min_distance_goal = distance_getter_esdf_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
+    if (min_distance_goal < kRobotRadius_) {
+      publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
+      ROS_INFO("Not planning, goal pose invalid");
+      std::cout << "min_distance_goal: " << min_distance_goal << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
+      planning_ = false;
+      return;
+    }
   } else {
-    std::cout << "getting distances from occupancy map" << std::endl;
-    min_distance_start = distance_getter_occ_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
-    min_distance_goal = distance_getter_occ_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
+    // TODO: HOW TO CHECK IF USING WAVERIDER
   }
 
 
-  std::cout << "min_distance_start: " << min_distance_start << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
-  std::cout << "min_distance_goal: " << min_distance_goal << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
-  // double min_distance_start_occ = distance_getter_occ_(Eigen::Vector2d(start_pose.pose.position.x, start_pose.pose.position.y));
-  // double min_distance_goal_occ = distance_getter_occ_(Eigen::Vector2d(goal_pose.pose.position.x, goal_pose.pose.position.y));
-  // std::cout << "min_distance_start_occ: " << min_distance_start_occ << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
-  // std::cout << "min_distance_goal_occ: " << min_distance_goal_occ << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
-
-  if (min_distance_start < kRobotRadius_) {
-    publishLocalPlannerFeedback(Feedback::INVALID_START);
-    ROS_INFO("Not planning, start pose invalid");
-    std::cout << "min_distance_start: " << min_distance_start << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
-    return;
-  }
-  if (min_distance_goal < kRobotRadius_) {
-    publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
-    ROS_INFO("Not planning, goal pose invalid");
-    std::cout << "min_distance_goal: " << min_distance_goal << ", kRobotRadius_: " << kRobotRadius_ << std::endl;
-    return;
-  }
 
   getTrajectory(start_pose.pose, goal_pose.pose, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
 }
