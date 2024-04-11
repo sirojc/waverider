@@ -1,7 +1,7 @@
 <launch>
   <!-- Wavemap params -->
   <arg name="param_file_wavemap"
-       default="$(find wavemap_ros)/config/alma_hashed_wavelet.yaml"
+       default="$(find wavemap_ros)/config/alma_hashed_wavelet_adaptive.yaml"
        doc="Name of the file from which to read wavemap's server params."/>
   <arg name="param_file_waverider"
        default="$(find waverider_ros)/config/alma_waverider.yaml"

@@ -40,6 +40,8 @@ WaveriderServer::WaveriderServer(ros::NodeHandle nh, ros::NodeHandle nh_private,
 
   srv_level_toggle_ = nh.advertiseService(
       "toggle_levels", &WaveriderServer::toggleServiceCallback, this);
+
+  waverider_policy_.setOccupancyThreshold(0.01);
 }
 
 void WaveriderServer::updateMap(

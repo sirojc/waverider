@@ -274,7 +274,9 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
   target_policy.setA(Eigen::Matrix3d::Identity()*10);
   std::cout << "3" << std::endl;
 
+  // TODO: move this to member var.
   waverider::WaveriderPolicy waverider_policy;
+  waverider_policy.setOccupancyThreshold(0.01);
   if(flat_res_){
     waverider_policy.run_all_levels_ = false;
     waverider_policy.obstacle_filter_.lowest_level_radius_ = flat_res_radius_;
