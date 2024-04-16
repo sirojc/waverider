@@ -20,6 +20,7 @@ add_action_files(
     action
   FILES
     PlanToGoalLocalGuidance.action
+    PlanToGoalWaverider.action
 )
 
 add_service_files(

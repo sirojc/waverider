@@ -28,6 +28,8 @@ add_wavemap_compile_definitions_and_options()
 # Binaries
 cs_add_executable(waverider_chomp_planner_node src/waverider_chomp_planner.cc)
 # target_link_libraries(waverider_chomp_planner_node ${PROJECT_NAME})
+cs_add_executable(waverider_planner_node src/waverider_planner.cc)
+# target_link_libraries(waverider_planner_node ${PROJECT_NAME})
 
 # Export
 cs_install()
