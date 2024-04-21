@@ -11,7 +11,9 @@ add_wavemap_compile_definitions_and_options()
 cs_add_library(${PROJECT_NAME}
         src/obstacle_filter.cc
         src/parallelized_policy.cc
-        src/waverider_policy.cc)
+        src/waverider_policy.cc
+        src/parallelized_policy_2d.cc
+        src/waverider_policy_2d.cc)
 
 # Export
 cs_install()

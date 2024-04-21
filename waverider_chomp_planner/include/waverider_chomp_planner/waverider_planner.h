@@ -16,7 +16,7 @@
 
 // policies
 #include <rmpcpp/policies/simple_target_policy.h>
-#include <waverider/waverider_policy.h>
+#include <waverider/waverider_policy_2d.h>
 
 // wavemap
 #include <wavemap_ros_conversions/map_msg_conversions.h>
@@ -79,8 +79,8 @@ private:
   ros::Subscriber sub_wavemap_;
 
   // policies
-  rmpcpp::SimpleTargetPolicy<rmpcpp::Space<3>> target_policy_;
-  waverider::WaveriderPolicy waverider_policy_;
+  rmpcpp::SimpleTargetPolicy<rmpcpp::Space<2>> target_policy_;
+  waverider::WaveriderPolicy2D waverider_policy_;
 
   // wavemap
   wavemap::VolumetricDataStructureBase::Ptr occupancy_map_;
@@ -91,7 +91,8 @@ private:
 
   // other stuff
   double delta_t_;
-  rmpcpp::State<3> curr_state_;
+  rmpcpp::State<2> curr_state_;
+  double curr_height_;
   double curr_yaw_;
 
   Eigen::Vector2d des_position_;

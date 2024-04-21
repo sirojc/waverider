@@ -13,7 +13,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
   : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_planner/plan_path", false),
   tf_buffer_(), tf_listener_(tf_buffer_), tol_position_(0.1), tol_rotation_(0.1), planning_(false),
   last_time_stamp_ (0.0), prev_pos_(nullptr), prev_vel_(nullptr), prev_acc_(nullptr),
-  reached_pos_(false), delta_t_(delta_t), curr_yaw_(0), load_map_from_file_(load_map_from_file) {
+  reached_pos_(false), delta_t_(delta_t), curr_height_(0), curr_yaw_(0), load_map_from_file_(load_map_from_file) {
     // action
     get_path_action_srv_.registerGoalCallback(boost::bind(&Planner::goalCB, this));
     get_path_action_srv_.registerPreemptCallback(boost::bind(&Planner::preemptCB, this));
@@ -47,7 +47,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
 
     std::cout << "*********************** initializing target_policy_ with: alpha=" << alpha << ", beta=" << beta << ", gamma=" << gamma << ", factor_A=" << factor_A << std::endl;
     target_policy_.setTuning(alpha, beta, gamma);
-    target_policy_.setA(Eigen::Matrix3d::Identity() * factor_A);
+    target_policy_.setA(Eigen::Matrix2d::Identity() * factor_A);
 
     waverider::PolicyTuning tuning;
     tuning.r = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/r", 1.3);
@@ -127,21 +127,21 @@ bool Planner::isYawTargetReached() {
 Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   std::cout << "----------------------------------------------------- getLinearTargetAcceleration" << std::endl;
   // evaluate target policy
-  rmpcpp::PolicyValue<3> target_result = target_policy_.evaluateAt(curr_state_);
+  rmpcpp::PolicyValue<2> target_result = target_policy_.evaluateAt(curr_state_);
   std::cout << "target_result acc: " << target_result.f_ << std::endl;
   std::cout << "scaled target_result acc: " << target_result.A_ * target_result.f_ << std::endl;
 
   // evaluate waverider policy
-  rmpcpp::PolicyValue<3> waverider_result = waverider_policy_.evaluateAt(curr_state_);
-  // std::cout << "waverider_result acc: " << waverider_result.f_ << std::endl;
-  // std::cout << "scaled waverider_result acc: " << waverider_result.A_ * waverider_result.f_ << std::endl;
+  rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.5);
+  std::cout << "waverider_result acc: " << waverider_result.f_ << std::endl;
+  std::cout << "scaled waverider_result acc: " << waverider_result.A_ * waverider_result.f_ << std::endl;
   std::cout << "scaled waverider_result acc: deactivated" << std::endl;
 
   // get target acceleration
-  std::vector<rmpcpp::PolicyValue<3>> policies = {target_result};
-  // std::vector<rmpcpp::PolicyValue<3>> policies = {target_result, waverider_result};
-  rmpcpp::PolicyValue<3> final_policy = rmpcpp::PolicyValue<3>::sum(policies);
-  Eigen::Vector3d acceleration = final_policy.f_;
+  std::vector<rmpcpp::PolicyValue<2>> policies = {target_result};
+  // std::vector<rmpcpp::PolicyValue<2>> policies = {target_result, waverider_result};
+  rmpcpp::PolicyValue<2> final_policy = rmpcpp::PolicyValue<2>::sum(policies);
+  Eigen::Vector2d acceleration = final_policy.f_;
 
   std::cout << "initial accelerations_x_y: " << acceleration[0] << ", " << acceleration[1] << std::endl;
 
@@ -335,7 +335,7 @@ bool Planner::updateObstacles() {
     return false;
   }
 
-  waverider_policy_.updateObstacles(*hashed_map_, curr_state_.pos_.cast<float>()); 
+  waverider_policy_.updateObstacles(*hashed_map_, Eigen::Vector3f(curr_state_.pos_[0], curr_state_.pos_[1], curr_height_)); 
 
   return true; 
 }
@@ -381,6 +381,8 @@ bool Planner::updateCurrentState() {
 
   std::cout << "current_base_pose: " << current_base_pose << std::endl;
 
+  curr_height_ = current_base_pose.pose.position.z;
+
   tf2::Quaternion quat;
   tf2::convert(current_base_pose.pose.orientation, quat);
   tf2::Matrix3x3 mat(quat);
@@ -402,46 +404,41 @@ bool Planner::updateCurrentState() {
     
     last_time_stamp_  = current_time;
     
-    *prev_pos_ = curr_state_.pos_.head(2);
-    curr_state_.pos_ = Eigen::Vector3d(current_base_pose.pose.position.x, current_base_pose.pose.position.y,
-                                       current_base_pose.pose.position.z);
+    *prev_pos_ = curr_state_.pos_;
+    curr_state_.pos_ = Eigen::Vector2d(current_base_pose.pose.position.x, current_base_pose.pose.position.y);
     
     if(prev_vel_) {
       ROS_INFO_ONCE("prev_vel_ initialized");
-      *prev_vel_ = curr_state_.vel_.head(2);
-      curr_state_.vel_ = Eigen::Vector3d((curr_state_.pos_[0] - (*prev_pos_)[0]) / delta_t_,
-                                         (curr_state_.pos_[1] - (*prev_pos_)[1]) / delta_t_,
-                                         0.0);
+      *prev_vel_ = curr_state_.vel_;
+      curr_state_.vel_ = Eigen::Vector2d((curr_state_.pos_[0] - (*prev_pos_)[0]) / delta_t_,
+                                         (curr_state_.pos_[1] - (*prev_pos_)[1]) / delta_t_);
 
       if(prev_acc_) {
         ROS_INFO_ONCE("prev_acc_ initialized");
-        *prev_acc_ = curr_state_.acc_.head(2);
-        curr_state_.acc_ = Eigen::Vector3d((curr_state_.vel_[0] - (*prev_vel_)[0]) / delta_t_,
-                                         (curr_state_.vel_[1] - (*prev_vel_)[1]) / delta_t_,
-                                         0.0);
+        *prev_acc_ = curr_state_.acc_;
+        curr_state_.acc_ = Eigen::Vector2d((curr_state_.vel_[0] - (*prev_vel_)[0]) / delta_t_,
+                                         (curr_state_.vel_[1] - (*prev_vel_)[1]) / delta_t_);
       } else {
-        curr_state_.acc_ = Eigen::Vector3d((curr_state_.vel_[0] - (*prev_vel_)[0]) / delta_t_,
-                                         (curr_state_.vel_[1] - (*prev_vel_)[1]) / delta_t_,
-                                         0.0);
-        prev_acc_ = new Eigen::Vector2d(curr_state_.acc_.head(2));;
+        curr_state_.acc_ = Eigen::Vector2d((curr_state_.vel_[0] - (*prev_vel_)[0]) / delta_t_,
+                                         (curr_state_.vel_[1] - (*prev_vel_)[1]) / delta_t_);
+        prev_acc_ = new Eigen::Vector2d(curr_state_.acc_);;
       }
 
     } else {
-      curr_state_.vel_ = Eigen::Vector3d((curr_state_.pos_[0] - (*prev_pos_)[0]) / delta_t_,
-                                         (curr_state_.pos_[1] - (*prev_pos_)[1]) / delta_t_,
-                                         0.0);
-      prev_vel_ = new Eigen::Vector2d(curr_state_.vel_.head(2));
-      curr_state_.acc_ = Eigen::Vector3d::Zero();
+      curr_state_.vel_ = Eigen::Vector2d((curr_state_.pos_[0] - (*prev_pos_)[0]) / delta_t_,
+                                         (curr_state_.pos_[1] - (*prev_pos_)[1]) / delta_t_);
+      prev_vel_ = new Eigen::Vector2d(curr_state_.vel_);
+      curr_state_.acc_ = Eigen::Vector2d::Zero();
     }
   } else {
     last_time_stamp_ = transformStamped.header.stamp.sec + (transformStamped.header.stamp.nsec / 1e9);
     std::cout << std::setprecision(9) << "last_time_stamp_: " << last_time_stamp_ << std::endl;
 
-    curr_state_.pos_ = Eigen::Vector3d(current_base_pose.pose.position.x, current_base_pose.pose.position.y, current_base_pose.pose.position.z);
+    curr_state_.pos_ = Eigen::Vector2d(current_base_pose.pose.position.x, current_base_pose.pose.position.y);
     prev_pos_ = new Eigen::Vector2d(curr_state_.pos_.head(2));
 
-    curr_state_.vel_ = Eigen::Vector3d::Zero();
-    curr_state_.acc_ = Eigen::Vector3d::Zero();
+    curr_state_.vel_ = Eigen::Vector2d::Zero();
+    curr_state_.acc_ = Eigen::Vector2d::Zero();
   }
 
   // std::cout << "-- finished calc" << std::endl;
@@ -511,7 +508,7 @@ void Planner::goalCB() {
 
   // set target
   des_position_ = Eigen::Vector2d(requested_goal->goal.pose.position.x, requested_goal->goal.pose.position.y);
-  target_policy_.setTarget(Eigen::Vector3d(requested_goal->goal.pose.position.x, requested_goal->goal.pose.position.y, requested_goal->goal.pose.position.z));
+  target_policy_.setTarget(Eigen::Vector2d(requested_goal->goal.pose.position.x, requested_goal->goal.pose.position.y));
 
   tf2::Quaternion quat;
   tf2::convert(requested_goal->goal.pose.orientation, quat);
@@ -550,7 +547,7 @@ int main(int argc, char** argv)
   nh_private.getParam("load_map_from_file", load_map_from_file);
   std::cout << "load_map_from_file: " << load_map_from_file << std::endl;
 
-  double delta_t = 0.01;
+  double delta_t = 0.1;
 
   waverider_planner::Planner planner(nh, nh_private, delta_t, load_map_from_file);
   
