@@ -72,6 +72,11 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
   ROS_INFO("Ready for queries.");
 }
 
+Planner::~Planner() {
+  publishLocalPlannerFeedback(Feedback::NODE_SHUTDOWN);
+  get_path_action_srv_.setAborted();
+}
+
 bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
   // check if the trajectory is collision free
   bool is_collision_free = true;
@@ -668,6 +673,7 @@ void Planner::preemptCB() {
   ROS_INFO("preemptCB");
 
   // set the action state to preempted
+  planning_ = false;
   get_path_action_srv_.setPreempted();
 }
 

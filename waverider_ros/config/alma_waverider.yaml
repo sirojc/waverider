@@ -1,4 +1,4 @@
 planner:
   world_frame: "map"
   publish_debug_visuals_every_n_iterations: 1 # -1 to disable (probably)
-  get_state_from_tf_frame: "odom"  # Leave blank to disable
+  get_state_from_tf_frame: ""  # Leave blank to disable

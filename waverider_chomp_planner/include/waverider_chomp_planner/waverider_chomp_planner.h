@@ -49,7 +49,8 @@ using FeedbackStatus = Feedback::_status_local_planner_type;
 class Planner {
 public:
   Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_from_file, std::string frame, float propagation_distance);
-
+  ~Planner();
+  
   void processActionServerGoals(ros::AsyncSpinner& spinner);
   void goalCB();
   void preemptCB();
