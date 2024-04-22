@@ -12,6 +12,7 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/Vector3Stamped.h>
 #include <navigation_msgs/PoseStamped.h>
 
 // policies
@@ -38,16 +39,21 @@ using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalWaveriderFeedbackPtr
 
 class Planner {
 public:
-  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, bool load_map_from_file);
+  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
+          std::string planner_frame, bool load_map_from_file);
   ~Planner();
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
+  void callbackTwistMux(const geometry_msgs::TwistStamped& msg);
 
   bool updateCurrentState();
   bool updateObstacles();
 
   bool isPositionTargetReached();
   bool isYawTargetReached();
+
+  geometry_msgs::TwistStamped transform_twist(const geometry_msgs::TwistStamped& initial_twist, const std::string& target_frame,
+                                              const geometry_msgs::TransformStamped& transformStamped);
 
   void TargetTwistCommandApproach();
   void TargetTwistCommandFinalRotation();
@@ -75,8 +81,17 @@ private:
   tf2_ros::TransformListener tf_listener_;
 
   ros::Publisher pub_twist_commands_;
+  ros::Publisher pub_des_pos_; // for visualization purposes
+  ros::Publisher pub_des_vel_; // for visualization purposes
+  ros::Publisher pub_des_acc_target_; // for visualization purposes
+  ros::Publisher pub_des_acc_waverider_; // for visualization purposes
+  ros::Publisher pub_des_acc_final_; // for visualization purposes
+  ros::Publisher pub_estimated_pos_;
+  ros::Publisher pub_estimated_vel_;
+  ros::Publisher pub_estimated_acc_;
   ros::Publisher pub_occupancy_;
   ros::Subscriber sub_wavemap_;
+  ros::Subscriber sub_twist_mux_; // for visualization purposes
 
   // policies
   rmpcpp::SimpleTargetPolicy<rmpcpp::Space<2>> target_policy_;
@@ -90,6 +105,8 @@ private:
   double tol_rotation_;
 
   // other stuff
+  std::string planner_frame_;
+
   double delta_t_;
   rmpcpp::State<2> curr_state_;
   double curr_height_;
@@ -107,6 +124,8 @@ private:
   Eigen::Vector2d* prev_vel_; // assumption: 0 vel. in beginning
   Eigen::Vector2d* prev_acc_; // assumption: 0 acc. in beginning
   bool load_map_from_file_;
+
+  geometry_msgs::TwistStamped twist_mux_twist_; // for visualization purposes
 };
 
 }  //  waverider_planner

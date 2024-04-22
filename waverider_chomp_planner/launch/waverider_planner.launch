@@ -10,6 +10,9 @@
        default="false"
        doc="Automatically launch Rviz."/>
   
+<arg name="planner_frame"
+     default="map"
+     doc="Frame planner uses for planning (should match wavemap frame)."/>
   <arg name="load_map_from_file"
        default="false"
        doc="Load the map from a file."/>
@@ -27,6 +30,7 @@
   <!-- Run the waverider planner -->
   <node name="waverider_planner" pkg="waverider_chomp_planner" type="waverider_planner_node"
         output="screen" launch-prefix="">
+    <param name="planner_frame" value="$(arg planner_frame)"/>
     <param name="load_map_from_file" value="$(arg load_map_from_file)"/>
     <rosparam file="$(arg param_file_waverider_planner)"/>
   </node>
