@@ -31,6 +31,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     pub_estimated_pos_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/estimated_pos", 10, true);
     pub_estimated_vel_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/estimated_vel", 10, true);
     pub_estimated_acc_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/estimated_acc", 10, true);
+    pub_des_est_yaw_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/des_est_yaw", 10, true);
     pub_occupancy_ = nh.advertise<wavemap_msgs::Map>("waverider_planner/map", 10, true);
     sub_wavemap_ = nh_.subscribe("/wavemap/map", 1, &Planner::callbackMap, this);
     sub_twist_mux_ = nh_.subscribe("/twist_mux/twist", 1, &Planner::callbackTwistMux, this);
@@ -49,6 +50,10 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
                                     occupancy_map_msg);
       pub_occupancy_.publish(occupancy_map_msg);
     }
+
+    // velocity control
+    double k_vel_ctrl_ = param_io::param<double>(nh_, "/waverider_planner/k_vel_ctrl", 0.5);
+    std::cout << "*********************** initializing yaw_contrl with: k_vel_ctrl_=" << k_vel_ctrl_ << std::endl;
 
     // policy initialization
     double alpha = param_io::param<double>(nh_, "/waverider_planner/target_policy/alpha", 1.0);
@@ -234,7 +239,8 @@ Eigen::Vector2d Planner::getLinearTargetVelocity(const Eigen::Vector2d& accelera
   std::cout << "------ prev_vel_: " << std::endl << *prev_vel_ << std::endl;
   std::cout << "------ prev_acc_: " << std::endl << *prev_acc_ << std::endl;
 
-  Eigen::Vector2d target_velocity = *prev_vel_ + (delta_t_ / 2.0) * (accelerations + *prev_acc_);
+  Eigen::Vector2d target_velocity = *prev_vel_ + delta_t_ * accelerations;
+  // Eigen::Vector2d target_velocity = *prev_vel_ + (delta_t_ / 2.0) * (accelerations + *prev_acc_);
 
   std::cout << "------ initial target_velocity: " << std::endl << target_velocity << std::endl;
 
@@ -263,8 +269,7 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
   std::cout << "------ diff_heading (converted to deg): " << std::endl << diff_heading * 180.0 / M_PI << std::endl;
 
   // p controller for jaw twist
-  double k = 0.5; // todo: add as member var and tune
-  double yaw_velocity = k * diff_heading;
+  double yaw_velocity = k_vel_ctrl_ * diff_heading;
 
   std::cout << "------ initial yaw_velocity: " << std::endl << yaw_velocity << std::endl;
 
@@ -272,6 +277,15 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
   yaw_velocity = std::min(std::max(yaw_velocity, -max_angular_vel_), max_angular_vel_);
 
   std::cout << "------ final yaw_velocity: " << std::endl << yaw_velocity << std::endl;
+
+
+  geometry_msgs::Vector3Stamped yaw_msg;
+  yaw_msg.header.stamp = ros::Time::now();
+  yaw_msg.header.frame_id = planner_frame_;
+  yaw_msg.vector.x = des_heading;
+  yaw_msg.vector.y = curr_heading; 
+  yaw_msg.vector.z = yaw_velocity;
+  pub_des_est_yaw_.publish(yaw_msg);
 
   return yaw_velocity;
 }
@@ -661,7 +675,7 @@ int main(int argc, char** argv)
   nh_private.getParam("planner_frame", planner_frame);
   std::cout << "planner_frame: " << planner_frame.c_str() << std::endl;
 
-  double delta_t = 0.1;
+  double delta_t = 0.2;
 
   waverider_planner::Planner planner(nh, nh_private, delta_t, planner_frame, load_map_from_file);
   

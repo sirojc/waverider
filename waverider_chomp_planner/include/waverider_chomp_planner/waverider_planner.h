@@ -86,6 +86,7 @@ private:
   ros::Publisher pub_des_acc_target_; // for visualization purposes
   ros::Publisher pub_des_acc_waverider_; // for visualization purposes
   ros::Publisher pub_des_acc_final_; // for visualization purposes
+  ros::Publisher pub_des_est_yaw_; // for visualization purposes
   ros::Publisher pub_estimated_pos_;
   ros::Publisher pub_estimated_vel_;
   ros::Publisher pub_estimated_acc_;
@@ -124,6 +125,7 @@ private:
   Eigen::Vector2d* prev_vel_; // assumption: 0 vel. in beginning
   Eigen::Vector2d* prev_acc_; // assumption: 0 acc. in beginning
   bool load_map_from_file_;
+  double k_vel_ctrl_;
 
   geometry_msgs::TwistStamped twist_mux_twist_; // for visualization purposes
 };
