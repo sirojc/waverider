@@ -84,15 +84,11 @@ bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
     const auto position = trajectory.row(idx);
     double min_distance = 0;
     if (planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP) {
-      std::cout << "getting distances from esdf" << std::endl;
       min_distance = distance_getter_esdf_(position);
       if (min_distance <= kRobotRadius_) {
         std::cout << "Collision at position: " << position << " with distance: " << min_distance << std::endl;
         is_collision_free = false;
         break;
-      } else {
-        // TODO: HOW TO CHECK HERE?
-        return true;
       }
     }
   }
@@ -360,8 +356,7 @@ Eigen::MatrixXd Planner::getFullTraj(const Eigen::MatrixXd chomp_traj, const geo
 
   // calculate z for each step
   Eigen::MatrixXd z_pos(n_elements, 1);
-  z_pos << Eigen::MatrixXd::Ones(n_elements - 1, 1) * height_robot_,
-           goal.position.z;
+  z_pos << Eigen::MatrixXd::Ones(n_elements, 1) * height_robot_;
 
 
   Eigen::Quaterniond q_goal(goal.orientation.w, goal.orientation.x, goal.orientation.y, goal.orientation.z);
@@ -664,7 +659,7 @@ void Planner::goalCB() {
     // TODO: HOW TO CHECK IF USING WAVERIDER
   }
 
-
+  std::cout << "--------- local_guidance_mode: " << plan_req->path.path_segments[0].local_guidance_mode << std::endl;
 
   getTrajectory(start_pose.pose, goal_pose.pose, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
 }
