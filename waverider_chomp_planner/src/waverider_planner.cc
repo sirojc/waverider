@@ -9,12 +9,11 @@
 
 namespace waverider_planner {
 
-Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame, bool load_map_from_file)
+Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame, int n_past_elements, bool load_map_from_file)
   : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_planner/plan_path", false),
   tf_buffer_(), tf_listener_(tf_buffer_), tol_position_(0.1), tol_rotation_(0.1), planning_(false),
-  last_time_stamp_ (0.0), prev_pos_(nullptr), prev_vel_(nullptr), prev_acc_(nullptr),
-  reached_pos_(false), planner_frame_(planner_frame), delta_t_(delta_t), curr_height_(0), curr_yaw_(0), 
-  load_map_from_file_(load_map_from_file) {
+  last_time_stamp_ (0.0), n_past_elements_(n_past_elements), reached_pos_(false), planner_frame_(planner_frame), delta_t_(delta_t), curr_height_(0),
+  curr_yaw_(0), load_map_from_file_(load_map_from_file) {
     // action
     get_path_action_srv_.registerGoalCallback(boost::bind(&Planner::goalCB, this));
     get_path_action_srv_.registerPreemptCallback(boost::bind(&Planner::preemptCB, this));
@@ -22,7 +21,9 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
 
     // sub/pub init
     pub_twist_commands_ = nh_.advertise<geometry_msgs::TwistStamped>("/waverider_planner/twist", 10, true);
+    sub_wavemap_ = nh_.subscribe("/wavemap/map", 1, &Planner::callbackMap, this);
 
+    pub_waverider_obstacles_ = nh_.advertise<visualization_msgs::MarkerArray>("/waverider_planner/waverider_obstacles", 1);
     pub_des_pos_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/des_pos", 10, true);
     pub_des_vel_ = nh_.advertise<geometry_msgs::TwistStamped>("/waverider_planner/des_vel", 10, true);
     pub_des_acc_target_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/des_acc_target", 10, true);
@@ -33,7 +34,6 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     pub_estimated_acc_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/estimated_acc", 10, true);
     pub_des_est_yaw_ = nh_.advertise<geometry_msgs::Vector3Stamped>("/waverider_planner/des_est_yaw", 10, true);
     pub_occupancy_ = nh.advertise<wavemap_msgs::Map>("waverider_planner/map", 10, true);
-    sub_wavemap_ = nh_.subscribe("/wavemap/map", 1, &Planner::callbackMap, this);
     sub_twist_mux_ = nh_.subscribe("/twist_mux/twist", 1, &Planner::callbackTwistMux, this);
 
     // map
@@ -52,7 +52,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     }
 
     // velocity control
-    double k_vel_ctrl_ = param_io::param<double>(nh_, "/waverider_planner/k_vel_ctrl", 0.5);
+    k_vel_ctrl_ = param_io::param<double>(nh_, "/waverider_planner/velocity_controller/k", 0.5);
     std::cout << "*********************** initializing yaw_contrl with: k_vel_ctrl_=" << k_vel_ctrl_ << std::endl;
 
     // policy initialization
@@ -174,20 +174,37 @@ geometry_msgs::TwistStamped Planner::transform_twist(const geometry_msgs::TwistS
   return target_twist_transformed;
 }
 
+double Planner::getMedian(const std::deque<double>& data) {
+  std::deque<double> sorted_data(data);
+  std::sort(sorted_data.begin(), sorted_data.end());
+  int size = sorted_data.size();
+  if (size % 2 == 0) {
+      // Even number: median = average of middle two element
+      return (sorted_data[size / 2 - 1] + sorted_data[size / 2]) / 2.0;
+  } else {
+      // Odd number: median =  middle element
+      return sorted_data[size / 2];
+  }
+}
+
 Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   std::cout << "----------------------------------------------------- getLinearTargetAcceleration" << std::endl;
+  std::cout << "------ curr_state_.pos_: " << std::endl << curr_state_.pos_ << std::endl;
+  std::cout << "------ curr_state_.vel_: " << std::endl << curr_state_.vel_ << std::endl;
+  std::cout << "------ curr_state_.acc_: " << std::endl << curr_state_.acc_ << std::endl;
+
   // evaluate target policy
   rmpcpp::PolicyValue<2> target_result = target_policy_.evaluateAt(curr_state_);
-  Eigen::Vector2d scaled_target_acceleration = target_result.A_ * target_result.f_;
+  // Eigen::Vector2d scaled_target_acceleration = target_result.A_ * target_result.f_;
   std::cout << "------ target_result acc: " << std::endl << target_result.f_ << std::endl;
-  std::cout << "------ scaled target_result acc: " << std::endl << scaled_target_acceleration << std::endl;
+  // std::cout << "------ scaled target_result acc: " << std::endl << scaled_target_acceleration << std::endl;
 
   // evaluate waverider policy
   rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.4);
-  Eigen::Vector2d scaled_waverider_acceleration = waverider_result.A_ * waverider_result.f_;
+  // Eigen::Vector2d scaled_waverider_acceleration = waverider_result.A_ * waverider_result.f_;
   std::cout << "------ waverider_result acc: " << std::endl << waverider_result.f_ << std::endl;
-  std::cout << "------ scaled waverider_result acc: " << std::endl << scaled_waverider_acceleration << std::endl;
-  std::cout << "------ scaled waverider_result acc: deactivated" << std::endl;
+  // std::cout << "------ scaled waverider_result acc: " << std::endl << scaled_waverider_acceleration << std::endl;
+  // std::cout << "------ scaled waverider_result acc: deactivated" << std::endl;
 
   // get target acceleration
   // std::vector<rmpcpp::PolicyValue<2>> policies = {target_result};
@@ -206,8 +223,8 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   geometry_msgs::Vector3Stamped acceleration_msg_target;
   acceleration_msg_target.header.stamp = ros::Time::now();
   acceleration_msg_target.header.frame_id = planner_frame_;
-  acceleration_msg_target.vector.x = scaled_target_acceleration[0];
-  acceleration_msg_target.vector.y = scaled_target_acceleration[1]; 
+  acceleration_msg_target.vector.x = target_result.f_[0];
+  acceleration_msg_target.vector.y = target_result.f_[1]; 
   acceleration_msg_target.vector.z = 0.0;
   pub_des_acc_target_.publish(acceleration_msg_target);
 
@@ -215,8 +232,8 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   geometry_msgs::Vector3Stamped acceleration_msg_waverider;
   acceleration_msg_waverider.header.stamp = ros::Time::now();
   acceleration_msg_waverider.header.frame_id = planner_frame_;
-  acceleration_msg_waverider.vector.x = scaled_waverider_acceleration[0];
-  acceleration_msg_waverider.vector.y = scaled_waverider_acceleration[1]; 
+  acceleration_msg_waverider.vector.x = waverider_result.f_[0];
+  acceleration_msg_waverider.vector.y = waverider_result.f_[1]; 
   acceleration_msg_waverider.vector.z = 0.0;
   pub_des_acc_waverider_.publish(acceleration_msg_waverider);
 
@@ -236,11 +253,12 @@ Eigen::Vector2d Planner::getLinearTargetVelocity(const Eigen::Vector2d& accelera
   std::cout << "----------------------------------------------------- getLinearTargetVelocity" << std::endl;
 
   // trapezoidal rule
-  std::cout << "------ prev_vel_: " << std::endl << *prev_vel_ << std::endl;
-  std::cout << "------ prev_acc_: " << std::endl << *prev_acc_ << std::endl;
+  std::cout << "------ curr_state_.vel_: " << std::endl << curr_state_.vel_ << std::endl;
+  std::cout << "------ curr_state_.acc_: " << std::endl << curr_state_.acc_ << std::endl;
+  std::cout << "------ accelerations: " << std::endl << accelerations << std::endl;
 
-  Eigen::Vector2d target_velocity = *prev_vel_ + delta_t_ * accelerations;
-  // Eigen::Vector2d target_velocity = *prev_vel_ + (delta_t_ / 2.0) * (accelerations + *prev_acc_);
+  Eigen::Vector2d target_velocity = curr_state_.vel_ + delta_t_ * accelerations;
+  // Eigen::Vector2d target_velocity = curr_state_.vel_ + (delta_t_ / 2.0) * (accelerations + curr_state_.acc_);
 
   std::cout << "------ initial target_velocity: " << std::endl << target_velocity << std::endl;
 
@@ -257,8 +275,8 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
   std::cout << "----------------------------------------------------- getTargetYawVelocity" << std::endl;
   double diff_heading = des_heading - curr_heading;
 
-  std::cout << "------ des_heading (converted to deg): " << std::endl << des_heading * 180.0 / M_PI << std::endl;
-  std::cout << "------ curr_heading (converted to deg): " << std::endl << curr_heading * 180.0 / M_PI << std::endl;
+  std::cout << "------ des_heading: " << std::endl << des_heading << "rad = " << des_heading * 180.0 / M_PI << "deg" << std::endl;
+  std::cout << "------ curr_heading: " << std::endl << curr_heading << "rad = " << curr_heading * 180.0 / M_PI << "deg" << std::endl;
   
   if (diff_heading > M_PI) {
     diff_heading -= 2 * M_PI;
@@ -266,7 +284,9 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
     diff_heading += 2 * M_PI;
   }
 
-  std::cout << "------ diff_heading (converted to deg): " << std::endl << diff_heading * 180.0 / M_PI << std::endl;
+  std::cout << "------ diff_heading: " << std::endl << diff_heading << "rad = " << diff_heading * 180.0 / M_PI << "deg" << std::endl;
+
+  std::cout << "------ k_vel_ctrl_: " << std::endl << k_vel_ctrl_ << std::endl;
 
   // p controller for jaw twist
   double yaw_velocity = k_vel_ctrl_ * diff_heading;
@@ -282,9 +302,9 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
   geometry_msgs::Vector3Stamped yaw_msg;
   yaw_msg.header.stamp = ros::Time::now();
   yaw_msg.header.frame_id = planner_frame_;
-  yaw_msg.vector.x = des_heading;
-  yaw_msg.vector.y = curr_heading; 
-  yaw_msg.vector.z = yaw_velocity;
+  yaw_msg.vector.x = des_heading * 180.0 / M_PI;
+  yaw_msg.vector.y = curr_heading * 180.0 / M_PI; 
+  yaw_msg.vector.z = yaw_velocity * 180.0 / M_PI;
   pub_des_est_yaw_.publish(yaw_msg);
 
   return yaw_velocity;
@@ -338,6 +358,7 @@ void Planner::TargetTwistCommandFinalRotation() {
 void Planner::publishTargetTwist(const geometry_msgs::TwistStamped target_twist_planner_frame) {
   std::cout << "-------------------------------------------- publishTargetTwist" << std::endl;
 
+  assert(target_twist_planner_frame.header.frame_id == planner_frame_);
   pub_des_vel_.publish(target_twist_planner_frame);
 
   geometry_msgs::TransformStamped transformStamped;
@@ -363,6 +384,7 @@ void Planner::publishTargetTwist(const geometry_msgs::TwistStamped target_twist_
   geometry_msgs::TwistStamped target_twist_base = transform_twist(target_twist_planner_frame, "base", transformStamped);
   
   std::cout << "------ target_twist_base: " << std::endl << target_twist_base << std::endl;
+  assert(target_twist_base.header.frame_id == "base");
   pub_twist_commands_.publish(target_twist_base);
 }
 
@@ -414,6 +436,10 @@ bool Planner::updateObstacles() {
 
   waverider_policy_.updateObstacles(*hashed_map_, Eigen::Vector3f(curr_state_.pos_[0], curr_state_.pos_[1], curr_height_)); 
 
+  visualization_msgs::MarkerArray marker_array;
+  waverider::addFilteredObstaclesToMarkerArray(waverider_policy_.getObstacleCells(), planner_frame_, marker_array);
+  pub_waverider_obstacles_.publish(marker_array);
+
   return true; 
 }
 
@@ -427,8 +453,6 @@ bool Planner::updateCurrentState() {
   current_base_pose_base_frame.pose.orientation.w = 1.0;
 
   geometry_msgs::PoseStamped current_base_pose;
-  current_base_pose.header.stamp = ros::Time::now();
-  current_base_pose.header.frame_id = planner_frame_;
 
   double current_time = 0.0;
   try{
@@ -467,10 +491,18 @@ bool Planner::updateCurrentState() {
   mat.getRPY(roll, pitch, yaw);
   curr_yaw_ = yaw;
 
-
   // solution using consecutive frames
-  if(prev_pos_) {
-    ROS_INFO_ONCE("prev_pos_ initialized");
+  if(past_pos_x_.size() == n_past_elements_){
+    ROS_INFO_ONCE("past_pos_ initialized");
+
+    prev_pos_ = curr_state_.pos_;
+
+    past_pos_x_.push_back(current_base_pose.pose.position.x);
+    past_pos_y_.push_back(current_base_pose.pose.position.y);
+    past_pos_x_.pop_front();
+    past_pos_y_.pop_front();
+
+    curr_state_.pos_ = Eigen::Vector2d(getMedian(past_pos_x_), getMedian(past_pos_y_));
 
     // std::cout << std::setprecision(9) << "current_time: " << current_time << std::endl;
     delta_t_ = current_time - last_time_stamp_;
@@ -482,47 +514,71 @@ bool Planner::updateCurrentState() {
 
     last_time_stamp_  = current_time;
     
-    *prev_pos_ = curr_state_.pos_;
-    curr_state_.pos_ = Eigen::Vector2d(current_base_pose.pose.position.x, current_base_pose.pose.position.y);
-    
-    if(prev_vel_) {
-      ROS_INFO_ONCE("prev_vel_ initialized");
-      *prev_vel_ = curr_state_.vel_;
-      curr_state_.vel_ = Eigen::Vector2d((curr_state_.pos_[0] - (*prev_pos_)[0]) / delta_t_,
-                                         (curr_state_.pos_[1] - (*prev_pos_)[1]) / delta_t_);
+    if(past_vel_x_.size() == n_past_elements_) {
+      ROS_INFO_ONCE("past_vel initialized");
 
-      if(prev_acc_) {
-        ROS_INFO_ONCE("prev_acc_ initialized");
-        *prev_acc_ = curr_state_.acc_;
-        curr_state_.acc_ = Eigen::Vector2d((curr_state_.vel_[0] - (*prev_vel_)[0]) / delta_t_,
-                                         (curr_state_.vel_[1] - (*prev_vel_)[1]) / delta_t_);
+      prev_vel_ = curr_state_.vel_;
+
+      past_vel_x_.push_back((curr_state_.pos_[0] - prev_pos_[0]) / delta_t_);
+      past_vel_y_.push_back((curr_state_.pos_[1] - prev_pos_[1]) / delta_t_);
+      past_vel_x_.pop_front();
+      past_vel_y_.pop_front();
+
+      curr_state_.vel_ = Eigen::Vector2d(getMedian(past_vel_x_), getMedian(past_vel_y_));
+
+      if(past_acc_x_.size() == n_past_elements_) {
+        ROS_INFO_ONCE("past_acc initialized");
+
+        prev_acc_ = curr_state_.acc_;
+
+        past_acc_x_.push_back((curr_state_.vel_[0] - prev_vel_[0]) / delta_t_);
+        past_acc_y_.push_back((curr_state_.vel_[1] - prev_vel_[1]) / delta_t_);
+        past_acc_x_.pop_front();
+        past_acc_y_.pop_front();
+
+        curr_state_.acc_ = Eigen::Vector2d(getMedian(past_acc_x_), getMedian(past_acc_y_));
       } else {
-        curr_state_.acc_ = Eigen::Vector2d((curr_state_.vel_[0] - (*prev_vel_)[0]) / delta_t_,
-                                         (curr_state_.vel_[1] - (*prev_vel_)[1]) / delta_t_);
-        prev_acc_ = new Eigen::Vector2d(curr_state_.acc_);
+        // initialize past_acc_
+        past_acc_x_.push_back((curr_state_.vel_[0] - prev_vel_[0]) / delta_t_);
+        past_acc_y_.push_back((curr_state_.vel_[1] - prev_vel_[1]) / delta_t_);
+
+        curr_state_.acc_ = Eigen::Vector2d(getMedian(past_acc_x_), getMedian(past_acc_y_));
+        prev_acc_ = curr_state_.acc_;
       }
 
     } else {
-      curr_state_.vel_ = Eigen::Vector2d((curr_state_.pos_[0] - (*prev_pos_)[0]) / delta_t_,
-                                         (curr_state_.pos_[1] - (*prev_pos_)[1]) / delta_t_);
-      prev_vel_ = new Eigen::Vector2d(curr_state_.vel_);
+      // initialize past_vel_
+      past_vel_x_.push_back((curr_state_.pos_[0] - prev_pos_[0]) / delta_t_);
+      past_vel_y_.push_back((curr_state_.pos_[1] - prev_pos_[1]) / delta_t_);
+
+      curr_state_.vel_ = Eigen::Vector2d(getMedian(past_vel_x_), getMedian(past_vel_y_));
+      prev_vel_ = curr_state_.vel_;
+
       curr_state_.acc_ = Eigen::Vector2d::Zero();
     }
   } else {
+    // initialize past_pos_
     last_time_stamp_ = transformStamped.header.stamp.sec + (transformStamped.header.stamp.nsec / 1e9);
     //std::cout << std::setprecision(9) << "last_time_stamp_: " << std::endl << last_time_stamp_ << std::endl;
 
-    curr_state_.pos_ = Eigen::Vector2d(current_base_pose.pose.position.x, current_base_pose.pose.position.y);
-    prev_pos_ = new Eigen::Vector2d(curr_state_.pos_.head(2));
+    past_pos_x_.push_back(current_base_pose.pose.position.x);
+    past_pos_y_.push_back(current_base_pose.pose.position.y);
+
+    curr_state_.pos_ = Eigen::Vector2d(getMedian(past_pos_x_), getMedian(past_pos_y_));
+    prev_pos_ = curr_state_.pos_;
 
     curr_state_.vel_ = Eigen::Vector2d::Zero();
     curr_state_.acc_ = Eigen::Vector2d::Zero();
   }
 
+  assert(past_pos_x_.size() == past_pos_y_.size());
+  assert(past_vel_x_.size() == past_vel_y_.size());
+  assert(past_acc_x_.size() == past_acc_y_.size());
+
   // std::cout << "-- finished calc" << std::endl;
-  // if (prev_pos_) {std::cout << "------ prev pos: " << std::endl << *prev_pos_ << std::endl;}
-  // if (prev_vel_) {std::cout << "------ prev vel: " << std::endl << *prev_vel_ << std::endl;}
-  // if (prev_acc_) {std::cout << "------ prev acc: " << std::endl << *prev_acc_ << std::endl;}
+  // if (prev_pos_) {std::cout << "------ prev pos: " << std::endl << prev_pos_ << std::endl;}
+  // if (prev_vel_) {std::cout << "------ prev vel: " << std::endl << prev_vel_ << std::endl;}
+  // if (prev_acc_) {std::cout << "------ prev acc: " << std::endl << prev_acc_ << std::endl;}
 
   //std::cout << "------ current height: " << std::endl << curr_height_ << std::endl;
   std::cout << "------ current pos: " << std::endl << curr_state_.pos_ << std::endl;
@@ -621,8 +677,9 @@ void Planner::goalCB() {
   
   // get the new goal
   auto requested_goal = get_path_action_srv_.acceptNewGoal();
+  assert(requested_goal->goal.header.frame_id == planner_frame_);
 
-  std::cout << "----------------------requested_goal: " << std::endl << std::endl << *requested_goal << std::endl;
+  std::cout << "----------------------requested_goal: " << std::endl << *requested_goal << std::endl;
 
   // set tolerances
   tol_position_ = requested_goal->goal.tol.translation;
@@ -675,9 +732,18 @@ int main(int argc, char** argv)
   nh_private.getParam("planner_frame", planner_frame);
   std::cout << "planner_frame: " << planner_frame.c_str() << std::endl;
 
-  double delta_t = 0.2;
+  double n_past_seconds;
+  nh_private.getParam("n_past_seconds", n_past_seconds);
+  std::cout << "n_past_seconds: " << n_past_seconds << std::endl;
 
-  waverider_planner::Planner planner(nh, nh_private, delta_t, planner_frame, load_map_from_file);
+  double delta_t = 0.1;
+  int n_past_elements = std::ceil(n_past_seconds / delta_t); // round up
+  n_past_elements += std::fmod(n_past_elements + 1, 2); // make uneven
+  std::cout << "n_past_elements: " << n_past_elements << std::endl;
+
+  // n_past_elements = 1;
+
+  waverider_planner::Planner planner(nh, nh_private, delta_t, planner_frame, n_past_elements, load_map_from_file);
   
   ros::Rate rate(1.0 / delta_t);
   while (ros::ok()) {

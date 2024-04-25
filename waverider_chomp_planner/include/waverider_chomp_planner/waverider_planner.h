@@ -32,6 +32,9 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer_interface.h>
 
+#include <visualization_msgs/MarkerArray.h>
+#include <waverider_ros/policy_visuals.h>
+
 namespace waverider_planner {
 
 using PlanningActionServer = actionlib::SimpleActionServer<waverider_chomp_msgs::PlanToGoalWaveriderAction>;
@@ -39,8 +42,8 @@ using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalWaveriderFeedbackPtr
 
 class Planner {
 public:
-  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
-          std::string planner_frame, bool load_map_from_file);
+  Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame,
+          int n_past_elements, bool load_map_from_file);
   ~Planner();
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
@@ -54,6 +57,8 @@ public:
 
   geometry_msgs::TwistStamped transform_twist(const geometry_msgs::TwistStamped& initial_twist, const std::string& target_frame,
                                               const geometry_msgs::TransformStamped& transformStamped);
+
+  double getMedian(const std::deque<double>& data);
 
   void TargetTwistCommandApproach();
   void TargetTwistCommandFinalRotation();
@@ -81,18 +86,21 @@ private:
   tf2_ros::TransformListener tf_listener_;
 
   ros::Publisher pub_twist_commands_;
-  ros::Publisher pub_des_pos_; // for visualization purposes
-  ros::Publisher pub_des_vel_; // for visualization purposes
-  ros::Publisher pub_des_acc_target_; // for visualization purposes
-  ros::Publisher pub_des_acc_waverider_; // for visualization purposes
-  ros::Publisher pub_des_acc_final_; // for visualization purposes
-  ros::Publisher pub_des_est_yaw_; // for visualization purposes
+  ros::Subscriber sub_wavemap_;
+
+  // debugging/ visualization
+  ros::Publisher pub_waverider_obstacles_;
+  ros::Publisher pub_des_pos_;
+  ros::Publisher pub_des_vel_;
+  ros::Publisher pub_des_acc_target_;
+  ros::Publisher pub_des_acc_waverider_;
+  ros::Publisher pub_des_acc_final_;
+  ros::Publisher pub_des_est_yaw_;
   ros::Publisher pub_estimated_pos_;
   ros::Publisher pub_estimated_vel_;
   ros::Publisher pub_estimated_acc_;
   ros::Publisher pub_occupancy_;
-  ros::Subscriber sub_wavemap_;
-  ros::Subscriber sub_twist_mux_; // for visualization purposes
+  ros::Subscriber sub_twist_mux_;
 
   // policies
   rmpcpp::SimpleTargetPolicy<rmpcpp::Space<2>> target_policy_;
@@ -109,7 +117,6 @@ private:
   std::string planner_frame_;
 
   double delta_t_;
-  rmpcpp::State<2> curr_state_;
   double curr_height_;
   double curr_yaw_;
 
@@ -120,10 +127,24 @@ private:
   double max_angular_vel_;
   bool planning_;
   bool reached_pos_;
+
+  rmpcpp::State<2> curr_state_;
+
+  std::deque<double> past_pos_x_;
+  std::deque<double> past_pos_y_;
+  Eigen::Vector2d prev_pos_;
+
+  std::deque<double> past_vel_x_;
+  std::deque<double> past_vel_y_;
+  Eigen::Vector2d prev_vel_;
+
+  std::deque<double> past_acc_x_;
+  std::deque<double> past_acc_y_;
+  Eigen::Vector2d prev_acc_;
+
   double last_time_stamp_;
-  Eigen::Vector2d* prev_pos_;
-  Eigen::Vector2d* prev_vel_; // assumption: 0 vel. in beginning
-  Eigen::Vector2d* prev_acc_; // assumption: 0 acc. in beginning
+  int n_past_elements_;
+
   bool load_map_from_file_;
   double k_vel_ctrl_;
 
