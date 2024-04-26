@@ -1,27 +1,36 @@
  <launch>
   <!-- General arguments -->
   <arg name="param_file"
-       default="$(find wavemap_ros)/config/alma_hashed_wavelet_adaptive.yaml"
-       doc="Name of the file from which to read wavemap's server params."/>
+     default="$(find wavemap_ros)/config/alma_hashed_wavelet_adaptive.yaml"
+     doc="Name of the file from which to read wavemap's server params."/>
   <arg name="debug_mode"
-       default="false"
-       doc="Run the mapper in a debugger (gdb)."/>
+     default="false"
+     doc="Run the mapper in a debugger (gdb)."/>
   <arg name="show_rviz"
-       default="false"
-       doc="Automatically launch Rviz."/>
+     default="false"
+     doc="Automatically launch Rviz."/>
   
-<arg name="planner_frame"
+  <arg name="planner_frame"
      default="map"
      doc="Frame planner uses for planning (should match wavemap frame)."/>
-<arg name="n_past_seconds"
+  <arg name="n_past_seconds_pos"
      default="1"
-     doc="Frame planner uses for planning (should match wavemap frame)."/>
+     doc="Filter time for position."/>
+  <arg name="n_past_seconds_vel"
+     default="1"
+     doc="Filter time for velocity."/>
+  <arg name="n_past_seconds_acc"
+     default="1"
+     doc="Filter time for acceleration."/>
   <arg name="load_map_from_file"
-       default="false"
-       doc="Load the map from a file."/>
+     default="false"
+     doc="Load the map from a file."/>
+  <arg name="limit_acc_change"
+     default="false"
+     doc="Whether to assume acceleration can change instantaneously."/>
   <arg name="param_file_waverider_planner"
-      default="$(find waverider_chomp_planner)/config/waverider_planner_param.yaml"
-      doc="Name of the file from which to read waverider planner's params."/>
+     default="$(find waverider_chomp_planner)/config/waverider_planner_param.yaml"
+     doc="Name of the file from which to read waverider planner's params."/>
 
   <!-- Run the wavemap server -->
   <!-- <include file="$(find wavemap_ros)/launch/wavemap_server.launch" unless="$(arg load_map_from_file)">
@@ -34,7 +43,10 @@
   <node name="waverider_planner" pkg="waverider_chomp_planner" type="waverider_planner_node"
         output="screen" launch-prefix="">
     <param name="planner_frame" value="$(arg planner_frame)"/>
-    <param name="n_past_seconds" value="$(arg n_past_seconds)"/>
+    <param name="n_past_seconds_pos" value="$(arg n_past_seconds_pos)"/>
+    <param name="n_past_seconds_vel" value="$(arg n_past_seconds_vel)"/>
+    <param name="n_past_seconds_acc" value="$(arg n_past_seconds_acc)"/>
+    <param name="limit_acc_change" value="$(arg limit_acc_change)"/>
     <param name="load_map_from_file" value="$(arg load_map_from_file)"/>
     <rosparam file="$(arg param_file_waverider_planner)"/>
   </node>

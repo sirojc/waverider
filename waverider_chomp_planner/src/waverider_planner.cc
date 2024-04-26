@@ -9,11 +9,12 @@
 
 namespace waverider_planner {
 
-Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame, int n_past_elements, bool load_map_from_file)
-  : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_planner/plan_path", false),
-  tf_buffer_(), tf_listener_(tf_buffer_), tol_position_(0.1), tol_rotation_(0.1), planning_(false),
-  last_time_stamp_ (0.0), n_past_elements_(n_past_elements), reached_pos_(false), planner_frame_(planner_frame), delta_t_(delta_t), curr_height_(0),
-  curr_yaw_(0), load_map_from_file_(load_map_from_file) {
+Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame, int n_past_elements_pos,
+                 int n_past_elements_vel, int n_past_elements_acc, bool limit_acc_change, bool load_map_from_file)
+  : nh_(nh), nh_private_(nh_private), get_path_action_srv_(nh, "/waverider_planner/plan_path", false), tf_buffer_(), tf_listener_(tf_buffer_),
+  tol_position_(0.1), tol_rotation_(0.1), planning_(false), last_time_stamp_ (0.0), n_past_elements_pos_(n_past_elements_pos),
+  n_past_elements_vel_(n_past_elements_vel), n_past_elements_acc_(n_past_elements_acc), reached_pos_(false), planner_frame_(planner_frame),
+  limit_acc_change_(limit_acc_change), delta_t_(delta_t), curr_height_(0), curr_yaw_(0), load_map_from_file_(load_map_from_file) {
     // action
     get_path_action_srv_.registerGoalCallback(boost::bind(&Planner::goalCB, this));
     get_path_action_srv_.registerPreemptCallback(boost::bind(&Planner::preemptCB, this));
@@ -249,16 +250,22 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   return acceleration;
 }
 
-Eigen::Vector2d Planner::getLinearTargetVelocity(const Eigen::Vector2d& accelerations) {
+Eigen::Vector2d Planner::getLinearTargetVelocity(const Eigen::Vector2d& des_accelerations) {
   std::cout << "----------------------------------------------------- getLinearTargetVelocity" << std::endl;
 
   // trapezoidal rule
   std::cout << "------ curr_state_.vel_: " << std::endl << curr_state_.vel_ << std::endl;
   std::cout << "------ curr_state_.acc_: " << std::endl << curr_state_.acc_ << std::endl;
-  std::cout << "------ accelerations: " << std::endl << accelerations << std::endl;
+  std::cout << "------ des_accelerations: " << std::endl << des_accelerations << std::endl;
 
-  Eigen::Vector2d target_velocity = curr_state_.vel_ + delta_t_ * accelerations;
-  // Eigen::Vector2d target_velocity = curr_state_.vel_ + (delta_t_ / 2.0) * (accelerations + curr_state_.acc_);
+  Eigen::Vector2d target_velocity;
+  if(limit_acc_change_) {
+    std::cout << "------ acc. change is limited" << std::endl;
+    target_velocity = curr_state_.vel_ + (delta_t_ / 2.0) * (des_accelerations + curr_state_.acc_);
+  } else {
+    std::cout << "------ acc. change is NOT limited" << std::endl;
+    target_velocity = curr_state_.vel_ + delta_t_ * des_accelerations;
+  }
 
   std::cout << "------ initial target_velocity: " << std::endl << target_velocity << std::endl;
 
@@ -492,7 +499,7 @@ bool Planner::updateCurrentState() {
   curr_yaw_ = yaw;
 
   // solution using consecutive frames
-  if(past_pos_x_.size() == n_past_elements_){
+  if(past_pos_x_.size() == n_past_elements_pos_){
     ROS_INFO_ONCE("past_pos_ initialized");
 
     prev_pos_ = curr_state_.pos_;
@@ -514,7 +521,7 @@ bool Planner::updateCurrentState() {
 
     last_time_stamp_  = current_time;
     
-    if(past_vel_x_.size() == n_past_elements_) {
+    if(past_vel_x_.size() == n_past_elements_vel_) {
       ROS_INFO_ONCE("past_vel initialized");
 
       prev_vel_ = curr_state_.vel_;
@@ -526,7 +533,7 @@ bool Planner::updateCurrentState() {
 
       curr_state_.vel_ = Eigen::Vector2d(getMedian(past_vel_x_), getMedian(past_vel_y_));
 
-      if(past_acc_x_.size() == n_past_elements_) {
+      if(past_acc_x_.size() == n_past_elements_acc_) {
         ROS_INFO_ONCE("past_acc initialized");
 
         prev_acc_ = curr_state_.acc_;
@@ -732,18 +739,37 @@ int main(int argc, char** argv)
   nh_private.getParam("planner_frame", planner_frame);
   std::cout << "planner_frame: " << planner_frame.c_str() << std::endl;
 
-  double n_past_seconds;
-  nh_private.getParam("n_past_seconds", n_past_seconds);
-  std::cout << "n_past_seconds: " << n_past_seconds << std::endl;
+  double n_past_seconds_pos, n_past_seconds_vel, n_past_seconds_acc;
+  nh_private.getParam("n_past_seconds_pos", n_past_seconds_pos);
+  nh_private.getParam("n_past_seconds_vel", n_past_seconds_vel);
+  nh_private.getParam("n_past_seconds_acc", n_past_seconds_acc);
+  std::cout << "n_past_seconds_pos: " << n_past_seconds_pos << std::endl;
+  std::cout << "n_past_seconds_vel: " << n_past_seconds_vel << std::endl;
+  std::cout << "n_past_seconds_acc: " << n_past_seconds_acc << std::endl;
 
   double delta_t = 0.1;
-  int n_past_elements = std::ceil(n_past_seconds / delta_t); // round up
-  n_past_elements += std::fmod(n_past_elements + 1, 2); // make uneven
-  std::cout << "n_past_elements: " << n_past_elements << std::endl;
+  int n_past_elements_pos = std::ceil(n_past_seconds_pos / delta_t); // round up
+  n_past_elements_pos += std::fmod(n_past_elements_pos + 1, 2); // make uneven
+  std::cout << "n_past_elements_pos: " << n_past_elements_pos << std::endl;
+
+  int n_past_elements_vel = std::ceil(n_past_seconds_vel / delta_t); // round up
+  n_past_elements_vel += std::fmod(n_past_elements_vel + 1, 2); // make uneven
+  std::cout << "n_past_elements_vel: " << n_past_elements_vel << std::endl;
+
+  int n_past_elements_acc = std::ceil(n_past_seconds_acc / delta_t); // round up
+  n_past_elements_acc += std::fmod(n_past_elements_acc + 1, 2); // make uneven
+  std::cout << "n_past_elements_acc: " << n_past_elements_acc << std::endl;
+
+  bool limit_acc_change;
+  nh_private.getParam("limit_acc_change", limit_acc_change);
+  std::cout << "limit_acc_change: " << limit_acc_change << std::endl;
+  
 
   // n_past_elements = 1;
 
-  waverider_planner::Planner planner(nh, nh_private, delta_t, planner_frame, n_past_elements, load_map_from_file);
+  waverider_planner::Planner planner(nh, nh_private, delta_t, planner_frame, n_past_elements_pos,
+                                     n_past_elements_vel, n_past_elements_acc, limit_acc_change,
+                                     load_map_from_file);
   
   ros::Rate rate(1.0 / delta_t);
   while (ros::ok()) {

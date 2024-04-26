@@ -43,7 +43,8 @@ using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalWaveriderFeedbackPtr
 class Planner {
 public:
   Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame,
-          int n_past_elements, bool load_map_from_file);
+          int n_past_elements_pos, int n_past_elements_vel, int n_past_elements_acc,
+          bool limit_acc_change, bool load_map_from_file);
   ~Planner();
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
@@ -64,7 +65,7 @@ public:
   void TargetTwistCommandFinalRotation();
   void publishTargetTwist(const geometry_msgs::TwistStamped target_twist);
   Eigen::Vector2d getLinearTargetAcceleration();
-  Eigen::Vector2d getLinearTargetVelocity(const Eigen::Vector2d& accelerations);
+  Eigen::Vector2d getLinearTargetVelocity(const Eigen::Vector2d& des_accelerations);
   double getTargetYawVelocity(double des_heading, double curr_heading);
 
   void run();
@@ -116,6 +117,8 @@ private:
   // other stuff
   std::string planner_frame_;
 
+  bool limit_acc_change_;
+
   double delta_t_;
   double curr_height_;
   double curr_yaw_;
@@ -130,20 +133,22 @@ private:
 
   rmpcpp::State<2> curr_state_;
 
+  int n_past_elements_pos_;
   std::deque<double> past_pos_x_;
   std::deque<double> past_pos_y_;
   Eigen::Vector2d prev_pos_;
 
+  int n_past_elements_vel_;
   std::deque<double> past_vel_x_;
   std::deque<double> past_vel_y_;
   Eigen::Vector2d prev_vel_;
 
+  int n_past_elements_acc_;
   std::deque<double> past_acc_x_;
   std::deque<double> past_acc_y_;
   Eigen::Vector2d prev_acc_;
 
   double last_time_stamp_;
-  int n_past_elements_;
 
   bool load_map_from_file_;
   double k_vel_ctrl_;
