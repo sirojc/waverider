@@ -1,7 +1,7 @@
 target_policy:
   alpha: 1.0
-  beta: 6.0 
-  gamma: 1.0
+  beta: 7.0 
+  gamma: 1.5
   factor_A: 10.0
 
 waverider_policy:
@@ -15,8 +15,8 @@ waverider_policy:
   enable_damper: true
   occupancy_threshold: 0.01
   run_all_levels: false
-  lowest_level_radius: 3.0
-  use_only_lowest_level: true
+  lowest_level_radius: 3.0 # range that obstacles are considered, only used if use_only_lowest_level=true, otherwise res. dep. distance
+  use_only_lowest_level: true # if true: all at highest available (leaf) resolution
 
 velocity_controller:
   k: 2.0

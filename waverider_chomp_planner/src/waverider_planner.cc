@@ -196,15 +196,11 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
 
   // evaluate target policy
   rmpcpp::PolicyValue<2> target_result = target_policy_.evaluateAt(curr_state_);
-  // Eigen::Vector2d scaled_target_acceleration = target_result.A_ * target_result.f_;
   std::cout << "------ target_result acc: " << std::endl << target_result.f_ << std::endl;
-  // std::cout << "------ scaled target_result acc: " << std::endl << scaled_target_acceleration << std::endl;
 
   // evaluate waverider policy
   rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.4);
-  // Eigen::Vector2d scaled_waverider_acceleration = waverider_result.A_ * waverider_result.f_;
   std::cout << "------ waverider_result acc: " << std::endl << waverider_result.f_ << std::endl;
-  // std::cout << "------ scaled waverider_result acc: " << std::endl << scaled_waverider_acceleration << std::endl;
   // std::cout << "------ scaled waverider_result acc: deactivated" << std::endl;
 
   // get target acceleration
@@ -279,6 +275,9 @@ Eigen::Vector2d Planner::getLinearTargetVelocity(const Eigen::Vector2d& des_acce
 }
 
 double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
+  des_heading = std::fmod(des_heading, 2 * M_PI);
+  curr_heading = std::fmod(curr_heading, 2 * M_PI);
+
   std::cout << "----------------------------------------------------- getTargetYawVelocity" << std::endl;
   double diff_heading = des_heading - curr_heading;
 
@@ -292,8 +291,6 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
   }
 
   std::cout << "------ diff_heading: " << std::endl << diff_heading << "rad = " << diff_heading * 180.0 / M_PI << "deg" << std::endl;
-
-  std::cout << "------ k_vel_ctrl_: " << std::endl << k_vel_ctrl_ << std::endl;
 
   // p controller for jaw twist
   double yaw_velocity = k_vel_ctrl_ * diff_heading;
@@ -326,13 +323,13 @@ void Planner::TargetTwistCommandApproach() {
   Eigen::Vector2d velocities_x_y = getLinearTargetVelocity(accelerations_x_y);
 
   // get desired yaw velocity
-  double des_yaw = std::fmod(std::atan2(velocities_x_y[1], velocities_x_y[0]), 2 * M_PI);
-  double yaw_velocity = getTargetYawVelocity(des_yaw, curr_yaw_);
+  double des_yaw_vel = std::atan2(velocities_x_y[1], velocities_x_y[0]);
+  double yaw_velocity = getTargetYawVelocity(des_yaw_vel, curr_yaw_);
 
   // get entire twist command
   geometry_msgs::TwistStamped twist_command;
   twist_command.header.stamp = ros::Time::now();
-  twist_command.header.frame_id = planner_frame_; // todo: probably not in this frame --> make variable and check what it should be
+  twist_command.header.frame_id = planner_frame_;
   twist_command.twist.linear.x = velocities_x_y[0];
   twist_command.twist.linear.y = velocities_x_y[1];
   twist_command.twist.linear.z = 0.0;
@@ -351,7 +348,7 @@ void Planner::TargetTwistCommandFinalRotation() {
   // get entire twist command
   geometry_msgs::TwistStamped twist_command;
   twist_command.header.stamp = ros::Time::now();
-  twist_command.header.frame_id = planner_frame_; // todo: probably not in this frame --> make variable and check what it should be
+  twist_command.header.frame_id = planner_frame_;
   twist_command.twist.linear.x = 0.0;
   twist_command.twist.linear.y = 0.0;
   twist_command.twist.linear.z = 0.0;
@@ -417,13 +414,6 @@ bool Planner::updateObstacles() {
   // check if occupancy_map_ is set
   if (!occupancy_map_) {
     ROS_ERROR("Occupancy map not initialized yet.");
-    planning_ = false;
-    reached_pos_ = false;
-
-    Goal result;
-    result.success = false;
-    get_path_action_srv_.setAborted(result);
-
     return false;
   }
 
@@ -431,13 +421,6 @@ bool Planner::updateObstacles() {
   auto hashed_map_ = std::dynamic_pointer_cast<wavemap::HashedWaveletOctree>(occupancy_map_);
   if (!hashed_map_) {
     ROS_ERROR("Failed to cast occupancy map to HashedWaveletOctree.");
-    planning_ = false;
-    reached_pos_ = false;
-
-    Goal result;
-    result.success = false;
-    get_path_action_srv_.setAborted(result);
-
     return false;
   }
 
@@ -648,6 +631,12 @@ void Planner::run() {
     std::cout << "---------------------------------------------------------------- planning" << std::endl;
     // update current planning env.
     if(!(updateObstacles())) {
+      planning_ = false;
+      reached_pos_ = false;
+
+      Goal result;
+      result.success = false;
+      get_path_action_srv_.setAborted(result);
       return;
     }
 
@@ -694,7 +683,7 @@ void Planner::goalCB() {
 
   // set target
   des_position_ = Eigen::Vector2d(requested_goal->goal.pose.position.x, requested_goal->goal.pose.position.y);
-  target_policy_.setTarget(Eigen::Vector2d(requested_goal->goal.pose.position.x, requested_goal->goal.pose.position.y));
+  target_policy_.setTarget(des_position_);
 
   tf2::Quaternion quat;
   tf2::convert(requested_goal->goal.pose.orientation, quat);
