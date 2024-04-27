@@ -381,10 +381,10 @@ Eigen::MatrixXd Planner::getFullTraj(const Eigen::MatrixXd chomp_traj, const geo
       diff_x = chomp_traj(i + 1, 0) - chomp_traj(i, 0);
       diff_y = chomp_traj(i + 1, 1) - chomp_traj(i, 1);
     } else {
-      diff_x = goal.position.x - chomp_traj(i, 0);
-      diff_y = goal.position.y - chomp_traj(i, 1);
+      diff_x = chomp_traj(i, 0) - chomp_traj(i - 1, 0);
+      diff_y = chomp_traj(i, 1) - chomp_traj(i - 1, 1);
     }
-      yaw_angle(i) = atan2(diff_y, diff_x);
+    yaw_angle(i) = atan2(diff_y, diff_x);
   }
   yaw_angle(n_elements - 1) = euler_angles_goal[2];
 
@@ -412,7 +412,14 @@ void Planner::callbackMap(const wavemap_msgs::Map::ConstPtr& msg) {
   }
 }
 
-void Planner::updateMap(const bool update_esdf, const wavemap::Point3D center_pose, const float distance) {
+bool Planner::updateMap(const bool update_esdf, const wavemap::Point3D center_pose, const float distance) {
+  // check if occupancy_map_ is set
+  if (!occupancy_map_) {
+    ROS_ERROR("Occupancy map not initialized yet.");
+
+    return false;
+  }
+
   // crop the occupancy map
   crop_map_operator_.run(occupancy_map_, center_pose, distance);
 
@@ -426,6 +433,7 @@ void Planner::updateMap(const bool update_esdf, const wavemap::Point3D center_po
   hashed_map_cropped_ = std::dynamic_pointer_cast<wavemap::HashedWaveletOctree>(occupancy_map_);
   if (!hashed_map_cropped_) {
     ROS_ERROR("Failed to cast occupancy map to HashedWaveletOctree.");
+    return false;
   }
 
   if (update_esdf) {
@@ -445,6 +453,8 @@ void Planner::updateMap(const bool update_esdf, const wavemap::Point3D center_po
     chomp_.setParameters(params_);
     // chomp_.setDistanceFunction(distance_getter_esdf_);
   }
+
+  return true;
 }
 
 bool Planner::setPlannerTypeService(waverider_chomp_msgs::SetPlannerType::Request& req,
@@ -610,6 +620,8 @@ void Planner::goalCB() {
       ROS_ERROR("%s",ex.what());
       publishLocalPlannerFeedback(Feedback::NO_GOAL_TF);
       planning_ = false;
+        
+      get_path_action_srv_.setAborted();
       return;
     }
 
@@ -630,7 +642,11 @@ void Planner::goalCB() {
                           start_pose.pose.position.y - center_point(1));
   float distance = radius.norm() + 3;
   std::cout << "--------- before updateMap" << std::endl;
-  updateMap(planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP, center_point, distance);
+  if (!updateMap(planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP, center_point, distance)) {
+    publishLocalPlannerFeedback(Feedback::NO_MAP);
+    planning_ = false;
+    return;
+  }
   std::cout << "--------- after updateMap" << std::endl;
 
   // adapt robot height

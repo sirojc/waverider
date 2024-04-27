@@ -75,7 +75,7 @@ public:
                               const geometry_msgs::Pose goal) const;
 
   void callbackMap(const wavemap_msgs::Map::ConstPtr& msg);
-  void updateMap(const bool update_esdf, const wavemap::Point3D center_pose,
+  bool updateMap(const bool update_esdf, const wavemap::Point3D center_pose,
                  const float distance);
 
   bool setPlannerTypeService(waverider_chomp_msgs::SetPlannerType::Request& req,
