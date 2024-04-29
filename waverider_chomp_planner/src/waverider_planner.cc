@@ -73,8 +73,8 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     tuning.nu_rep = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/nu_rep", 1.4);
     tuning.eta_damp = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/eta_damp", 140);
     tuning.nu_damp = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/nu_damp", 1.2);
-    tuning.enable_repulsor = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/enable_repulsor", true);
-    tuning.enable_damper = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/enable_damper", true);
+    tuning.enable_repulsor = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/enable_repulsor", true);
+    tuning.enable_damper = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/enable_damper", true);
 
     std::cout << "*********************** initializing PolicyTuning for waverider_policy_ with: r=" << tuning.r << ", c=" << tuning.c << ", eta_rep=" << tuning.eta_rep
           << ", nu_rep=" << tuning.nu_rep << ", eta_damp=" << tuning.eta_damp << ", nu_damp=" << tuning.nu_damp
@@ -82,9 +82,9 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     waverider_policy_.updateTuning(tuning); 
 
     double occupancy_threshold = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/occupancy_threshold", 0.01);
-    bool run_all_levels = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/run_all_levels", false);
+    bool run_all_levels = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/run_all_levels", false);
     double lowest_level_radius = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/lowest_level_radius", 1.0);
-    bool use_only_lowest_level = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/use_only_lowest_level", true);
+    bool use_only_lowest_level = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/use_only_lowest_level", true);
     
     std::cout << "*********************** initializing other param waverider: occupancy_threshold=" << occupancy_threshold << ", run_all_levels=" << run_all_levels
               << ", lowest_level_radius=" << lowest_level_radius << ", use_only_lowest_level=" << use_only_lowest_level << std::endl;
@@ -201,6 +201,7 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   // evaluate waverider policy
   rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.4);
   std::cout << "------ waverider_result acc: " << std::endl << waverider_result.f_ << std::endl;
+  std::cout << "------ waverider_result A: " << std::endl << waverider_result.A_ << std::endl;
   // std::cout << "------ scaled waverider_result acc: deactivated" << std::endl;
 
   // get target acceleration
@@ -217,20 +218,21 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
 
   std::cout << "------ cut accelerations_x_y: " << std::endl << acceleration[0] << ", " << acceleration[1] << std::endl;
 
+  Eigen::Vector2d scaled_target_acc = rmpcpp::PolicyValue<2>::pinv(final_policy.A_) * target_result.A_ * target_result.f_;
   geometry_msgs::Vector3Stamped acceleration_msg_target;
   acceleration_msg_target.header.stamp = ros::Time::now();
   acceleration_msg_target.header.frame_id = planner_frame_;
-  acceleration_msg_target.vector.x = target_result.f_[0];
-  acceleration_msg_target.vector.y = target_result.f_[1]; 
+  acceleration_msg_target.vector.x = scaled_target_acc[0];
+  acceleration_msg_target.vector.y = scaled_target_acc[1]; 
   acceleration_msg_target.vector.z = 0.0;
   pub_des_acc_target_.publish(acceleration_msg_target);
 
-
+  Eigen::Vector2d scaled_waverider_acc = rmpcpp::PolicyValue<2>::pinv(final_policy.A_) * waverider_result.A_ * waverider_result.f_;
   geometry_msgs::Vector3Stamped acceleration_msg_waverider;
   acceleration_msg_waverider.header.stamp = ros::Time::now();
   acceleration_msg_waverider.header.frame_id = planner_frame_;
-  acceleration_msg_waverider.vector.x = waverider_result.f_[0];
-  acceleration_msg_waverider.vector.y = waverider_result.f_[1]; 
+  acceleration_msg_waverider.vector.x = scaled_waverider_acc[0];
+  acceleration_msg_waverider.vector.y = scaled_waverider_acc[1]; 
   acceleration_msg_waverider.vector.z = 0.0;
   pub_des_acc_waverider_.publish(acceleration_msg_waverider);
 

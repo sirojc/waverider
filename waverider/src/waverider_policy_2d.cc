@@ -2,6 +2,8 @@
 #include "waverider/obstacle_filter.h"
 #include <tracy/Tracy.hpp>
 
+#include <iostream>
+
 namespace waverider {
 void WaveriderPolicy2D::updateObstacles(const wavemap::HashedWaveletOctree& map,
                                       const Point3D& robot_position) {
@@ -33,10 +35,12 @@ rmpcpp::PolicyValue<2> WaveriderPolicy2D::evaluateAt(const rmpcpp::State<2>& x, 
           considered_centers.push_back(center);
         }
       }
+      
+      std::cout << "---- WaveriderPolicy2D: n considered obstacles = " << considered_centers.size() << std::endl;
 
       ParallelizedPolicy2D pol_generator(considered_centers.size(),
                                          policy_tuning_);
-      pol_generator.setR(WavemapObstacleFilter::maxRangeForHeight(i)*1.5);
+      // pol_generator.setR(WavemapObstacleFilter::maxRangeForHeight(i)*1.5);
 
       pol_generator.init(considered_centers, x_pos, x_vel);
       all_policies.emplace_back(pol_generator.getPolicy());
