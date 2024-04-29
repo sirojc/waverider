@@ -1,16 +1,16 @@
 target_policy:
   alpha: 1.0
-  beta: 6.5 
+  beta: 7.0 
   gamma: 1.5
   factor_A: 8.0
 
 waverider_policy:
-  r: 2.5
-  c: 1.5
-  eta_rep: 1.2
-  nu_rep: 1.5
-  eta_damp: 3.0
-  nu_damp: 2.0
+  r: 2.0
+  c: 1.0
+  eta_rep: 2.0
+  nu_rep: 1.0
+  eta_damp: 4.0
+  nu_damp: 1.8
   enable_repulsor: true
   enable_damper: true
   occupancy_threshold: 0.01
