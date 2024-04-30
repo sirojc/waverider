@@ -33,6 +33,7 @@ add_message_files(
   FILES
     PlannerType.msg
     RobotState.msg
+    FloatStamped.msg
 )
 
 generate_messages(

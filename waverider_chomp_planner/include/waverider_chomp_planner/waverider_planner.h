@@ -14,6 +14,7 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <navigation_msgs/PoseStamped.h>
+#include <waverider_chomp_msgs/FloatStamped.h>
 
 // policies
 #include <rmpcpp/policies/simple_target_policy.h>
