@@ -36,7 +36,7 @@ rmpcpp::PolicyValue<2> WaveriderPolicy2D::evaluateAt(const rmpcpp::State<2>& x, 
         }
       }
       
-      std::cout << "---- WaveriderPolicy2D: n considered obstacles = " << considered_centers.size() << std::endl;
+      // std::cout << "---- WaveriderPolicy2D: n considered obstacles = " << considered_centers.size() << std::endl;
 
       ParallelizedPolicy2D pol_generator(considered_centers.size(),
                                          policy_tuning_);

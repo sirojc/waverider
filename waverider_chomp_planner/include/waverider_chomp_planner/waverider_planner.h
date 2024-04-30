@@ -98,6 +98,7 @@ private:
   ros::Publisher pub_des_acc_waverider_;
   ros::Publisher pub_des_acc_final_;
   ros::Publisher pub_des_est_yaw_;
+  ros::Publisher pub_diff_heading_;
   ros::Publisher pub_estimated_pos_;
   ros::Publisher pub_estimated_vel_;
   ros::Publisher pub_estimated_acc_;
@@ -132,9 +133,12 @@ private:
   bool planning_;
   bool reached_pos_;
 
+  double* prev_diff_heading_;
+
   rmpcpp::State<2> curr_state_;
 
   int n_past_elements_pos_;
+  std::deque<double> past_yaw_;
   std::deque<double> past_pos_x_;
   std::deque<double> past_pos_y_;
   Eigen::Vector2d prev_pos_;

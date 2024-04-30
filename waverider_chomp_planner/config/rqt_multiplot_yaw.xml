@@ -125,32 +125,7 @@
                             <subscriber_queue_size>100</subscriber_queue_size>
                             <title>des_yaw</title>
                         </curve_1>
-                    </curves>
-                    <legend>
-                        <visible>true</visible>
-                    </legend>
-                    <plot_rate>30</plot_rate>
-                    <title>Yaw</title>
-                </column_0>
-            </row_0>
-            <row_1>
-                <column_0>
-                    <axes>
-                        <axes>
-                            <x_axis>
-                                <custom_title>Untitled Axis</custom_title>
-                                <title_type>0</title_type>
-                                <title_visible>true</title_visible>
-                            </x_axis>
-                            <y_axis>
-                                <custom_title>Untitled Axis</custom_title>
-                                <title_type>0</title_type>
-                                <title_visible>true</title_visible>
-                            </y_axis>
-                        </axes>
-                    </axes>
-                    <curves>
-                        <curve_0>
+                        <curve_2>
                             <axes>
                                 <x_axis>
                                     <field>header/stamp</field>
@@ -162,11 +137,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_est_yaw</topic>
+                                    <topic>/waverider_planner/diff_heading</topic>
                                     <type>geometry_msgs/Vector3Stamped</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/z</field>
+                                    <field>vector/y</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -175,7 +150,7 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_est_yaw</topic>
+                                    <topic>/waverider_planner/diff_heading</topic>
                                     <type>geometry_msgs/Vector3Stamped</type>
                                 </y_axis>
                             </axes>
@@ -199,16 +174,16 @@
                                 <type>0</type>
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
-                            <title>des_yaw_vel</title>
-                        </curve_0>
+                            <title>diff_heading</title>
+                        </curve_2>
                     </curves>
                     <legend>
                         <visible>true</visible>
                     </legend>
                     <plot_rate>30</plot_rate>
-                    <title>Velocity</title>
+                    <title>Yaw</title>
                 </column_0>
-            </row_1>
+            </row_0>
         </plots>
         <track_points>false</track_points>
     </table>

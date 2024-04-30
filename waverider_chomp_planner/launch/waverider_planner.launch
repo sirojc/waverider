@@ -14,7 +14,7 @@
      default="map"
      doc="Frame planner uses for planning (should match wavemap frame)."/>
   <arg name="n_past_seconds_pos"
-     default="1"
+     default="0.5"
      doc="Filter time for position."/>
   <arg name="n_past_seconds_vel"
      default="1"
