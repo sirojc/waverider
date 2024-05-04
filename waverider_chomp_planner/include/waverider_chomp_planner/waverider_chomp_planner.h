@@ -100,6 +100,7 @@ private:
   ros::Publisher state_pub_;
   ros::Publisher trajectory_pub_;
   ros::Publisher trajectory_pub_arrows_;
+  ros::Publisher trajectory_pub_arrows_all_;
 
   ros::Subscriber map_sub_;
 
@@ -114,13 +115,10 @@ private:
   const float kOccupancyThreshold_ = 0.01f;
   float kMaxDistance_ = 5.f;
   wavemap::HashedBlocks::Ptr esdf_cropped_;
-  const float kRobotRadius_ = 0.5f;
-  const float kSafetyPadding_ = 0.1f;
-  const float paddedRobotRadius_ = kRobotRadius_ + kSafetyPadding_;
+  float robot_radius_;
   std::function<float(const Eigen::Vector2d&)> distance_getter_esdf_;
   wavemap::CropMapOperation crop_map_operator_;
   
-
   // robot
   const std::string planner_frame_ = "map";
   double height_robot_ = 0.65; // TODO: get from start

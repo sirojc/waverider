@@ -1,0 +1,9 @@
+# param chomp optimizer
+w_collision: 10.0
+w_smooth: 0.1
+lambda: 1000
+max_iter: 1000
+rel_tol: 0.0001
+robot_radius: 0.4
+robot_padding: 0.1
+decrease_step_size: true

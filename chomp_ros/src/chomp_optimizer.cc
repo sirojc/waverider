@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include <unistd.h>
+
 #include <Eigen/Cholesky>
 #include <tracy/Tracy.hpp>
 
@@ -208,7 +210,9 @@ double ChompOptimizer::getCost(const ChompTrajectory& traj) const {
 
 void ChompOptimizer::solveProblem(const Eigen::VectorXd& start,
                                   const Eigen::VectorXd& goal, int N,
-                                  ChompTrajectory* solution) {
+                                  ChompTrajectory* solution,
+                                  const double height_robot) {
+  height_robot_ = height_robot;
   // TODO(helenol): verify inputs!!!! That they match ChompParams.
   ChompTrajectory traj;
   createTrajectory(start, goal, N, &traj);
@@ -242,7 +246,33 @@ void ChompOptimizer::doGradientDescent(ChompTrajectory* traj) {
 
   int i = 0;
 
+  visualization_msgs::Marker trajectory_msg;
+  trajectory_msg.header.frame_id = frame_id_;
+  trajectory_msg.header.stamp = ros::Time::now();
+  trajectory_msg.type = visualization_msgs::Marker::LINE_STRIP;
+  trajectory_msg.action = visualization_msgs::Marker::ADD;
+  trajectory_msg.id = 100;
+  trajectory_msg.ns = "curr_trajectory";
+  trajectory_msg.scale.x = params_.epsilon;
+  trajectory_msg.scale.y = params_.epsilon;
+  trajectory_msg.scale.z = params_.epsilon;
+  trajectory_msg.color.g = 1.0;
+  trajectory_msg.color.b = 1.0;
+  trajectory_msg.color.a = 0.7;
+  trajectory_msg.pose.orientation.w = 1.0;
+
   for (i = 0; i < params_.max_iter; ++i) {
+    // visualize current traj.
+    trajectory_msg.points.clear();
+    for (int idx = 0; idx < traj->trajectory.rows(); ++idx) {
+      auto& position_msg = trajectory_msg.points.emplace_back();
+      position_msg.x = traj->trajectory(idx, 0);
+      position_msg.y = traj->trajectory(idx, 1);
+      position_msg.z = height_robot_;
+    }
+    curr_traj_pub_.publish(trajectory_msg);
+    // sleep(1);
+
     cost = getCost(*traj);
     getGradient(*traj, &gradient);
 

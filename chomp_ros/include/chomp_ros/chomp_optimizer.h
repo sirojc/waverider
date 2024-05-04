@@ -1,8 +1,11 @@
 #ifndef CHOMP_ROS_CHOMP_OPTIMIZER_H_
 #define CHOMP_ROS_CHOMP_OPTIMIZER_H_
 
+#include <ros/ros.h>
 #include <Eigen/Core>
 #include <glog/logging.h>
+
+#include <visualization_msgs/Marker.h>
 
 // NOTE: This CHOMP implementation is borrowed from Helen's mav_local_avoidance:
 //       https://github.com/ethz-asl/mav_local_avoidance/blob/master/local_trajectory_opt/include/local_trajectory_opt/chomp/chomp_optimizer.h
@@ -180,6 +183,15 @@ class CollisionFunc : public ChompCostFunc {
 
 class ChompOptimizer {
  public:
+  ChompOptimizer() : frame_id_("map"), height_robot_(0.5) {
+    ros::NodeHandle nh;
+    curr_traj_pub_ = nh.advertise<visualization_msgs::Marker>("waverider_chomp_planner/curr_chomp_opt_traj", 10, true);
+  }
+
+  ChompOptimizer(ros::NodeHandle nh, std::string frame_id, double height_robot) : frame_id_(frame_id), height_robot_(height_robot) {
+    curr_traj_pub_ = nh.advertise<visualization_msgs::Marker>("waverider_chomp_planner/curr_chomp_opt_traj", 10, true);
+  }
+
   void setParameters(const ChompParameters& params) {
     params_ = params;
     f_smooth_.setParameters(params_);
@@ -187,7 +199,7 @@ class ChompOptimizer {
   }
 
   void solveProblem(const Eigen::VectorXd& start, const Eigen::VectorXd& goal,
-                    int N, ChompTrajectory* solution);
+                    int N, ChompTrajectory* solution, const double height_robot=0.5);
 
   // Setup.
   void setupFromTrajectory(const ChompTrajectory& traj);
@@ -212,6 +224,11 @@ class ChompOptimizer {
   Eigen::MatrixXd getM() { return M_; }
 
  private:
+  // visualization
+  ros::Publisher curr_traj_pub_;
+  std::string frame_id_;
+  double height_robot_;
+
   ChompParameters params_;
 
   // Is this necessary to store?
