@@ -1,16 +1,16 @@
 target_policy:
-  alpha: 1.0
-  beta: 7.0 
-  gamma: 1.5
+  alpha: 2.0
+  beta: 10.0 
+  gamma: 0.5
   factor_A: 8.0
 
 waverider_policy:
-  r: 2.0
+  r: 1.0
   c: 1.0
-  eta_rep: 2.0
-  nu_rep: 1.0
-  eta_damp: 4.0
-  nu_damp: 1.8
+  eta_rep: 9.0
+  nu_rep: 0.9
+  eta_damp: 16.0
+  nu_damp: 2.5
   enable_repulsor: true
   enable_damper: true
   occupancy_threshold: 0.01
@@ -19,4 +19,4 @@ waverider_policy:
   use_only_lowest_level: true # if true: all at highest available (leaf) resolution
 
 velocity_controller:
-  k: 2.0
+  k: 0.3

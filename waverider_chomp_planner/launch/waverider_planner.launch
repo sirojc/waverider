@@ -14,14 +14,17 @@
      default="map"
      doc="Frame planner uses for planning (should match wavemap frame)."/>
   <arg name="n_past_seconds_pos"
-     default="0.5"
+     default="0.3"
      doc="Filter time for position."/>
   <arg name="n_past_seconds_vel"
-     default="1"
+     default="0.5"
      doc="Filter time for velocity."/>
   <arg name="n_past_seconds_acc"
-     default="1"
+     default="0.5"
      doc="Filter time for acceleration."/>
+  <arg name="n_past_seconds_des_yaw"
+     default="0.5"
+     doc="Filter time for des yaw."/>
   <arg name="load_map_from_file"
      default="false"
      doc="Load the map from a file."/>
@@ -46,6 +49,7 @@
     <param name="n_past_seconds_pos" value="$(arg n_past_seconds_pos)"/>
     <param name="n_past_seconds_vel" value="$(arg n_past_seconds_vel)"/>
     <param name="n_past_seconds_acc" value="$(arg n_past_seconds_acc)"/>
+    <param name="n_past_seconds_des_yaw" value="$(arg n_past_seconds_des_yaw)"/>
     <param name="limit_acc_change" value="$(arg limit_acc_change)"/>
     <param name="load_map_from_file" value="$(arg load_map_from_file)"/>
     <rosparam file="$(arg param_file_waverider_planner)"/>

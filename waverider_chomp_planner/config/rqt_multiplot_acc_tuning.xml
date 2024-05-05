@@ -35,11 +35,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_pos</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/x</field>
+                                    <field>pos_unfiltered/x</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -48,8 +48,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_pos</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -72,9 +72,60 @@
                                 <type>0</type>
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
-                            <title>x</title>
+                            <title>x_unfiltered</title>
                         </curve_0>
                         <curve_1>
+                            <axes>
+                                <x_axis>
+                                    <field>header/stamp</field>
+                                    <field_type>0</field_type>
+                                    <scale>
+                                        <absolute_maximum>1000</absolute_maximum>
+                                        <absolute_minimum>0</absolute_minimum>
+                                        <relative_maximum>0</relative_maximum>
+                                        <relative_minimum>-1000</relative_minimum>
+                                        <type>0</type>
+                                    </scale>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
+                                </x_axis>
+                                <y_axis>
+                                    <field>pos_filtered/x</field>
+                                    <field_type>0</field_type>
+                                    <scale>
+                                        <absolute_maximum>1000</absolute_maximum>
+                                        <absolute_minimum>0</absolute_minimum>
+                                        <relative_maximum>0</relative_maximum>
+                                        <relative_minimum>-1000</relative_minimum>
+                                        <type>0</type>
+                                    </scale>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
+                                </y_axis>
+                            </axes>
+                            <color>
+                                <custom_color>#000000</custom_color>
+                                <type>0</type>
+                            </color>
+                            <data>
+                                <circular_buffer_capacity>1000</circular_buffer_capacity>
+                                <time_frame_length>10</time_frame_length>
+                                <type>0</type>
+                            </data>
+                            <style>
+                                <lines_interpolate>false</lines_interpolate>
+                                <pen_style>1</pen_style>
+                                <pen_width>2</pen_width>
+                                <render_antialias>false</render_antialias>
+                                <steps_invert>false</steps_invert>
+                                <sticks_baseline>0</sticks_baseline>
+                                <sticks_orientation>2</sticks_orientation>
+                                <type>0</type>
+                            </style>
+                            <subscriber_queue_size>100</subscriber_queue_size>
+                            <title>x_filtered</title>
+                        </curve_1>
+                        <curve_2>
                             <axes>
                                 <x_axis>
                                     <field>header/stamp</field>
@@ -124,7 +175,7 @@
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
                             <title>des_x</title>
-                        </curve_1>
+                        </curve_2>
                     </curves>
                     <legend>
                         <visible>true</visible>
@@ -160,11 +211,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_pos</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/y</field>
+                                    <field>pos_unfiltered/y</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -173,8 +224,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_pos</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -197,9 +248,60 @@
                                 <type>0</type>
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
-                            <title>y</title>
+                            <title>y_unfiltered</title>
                         </curve_0>
                         <curve_1>
+                            <axes>
+                                <x_axis>
+                                    <field>header/stamp</field>
+                                    <field_type>0</field_type>
+                                    <scale>
+                                        <absolute_maximum>1000</absolute_maximum>
+                                        <absolute_minimum>0</absolute_minimum>
+                                        <relative_maximum>0</relative_maximum>
+                                        <relative_minimum>-1000</relative_minimum>
+                                        <type>0</type>
+                                    </scale>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
+                                </x_axis>
+                                <y_axis>
+                                    <field>pos_filtered/y</field>
+                                    <field_type>0</field_type>
+                                    <scale>
+                                        <absolute_maximum>1000</absolute_maximum>
+                                        <absolute_minimum>0</absolute_minimum>
+                                        <relative_maximum>0</relative_maximum>
+                                        <relative_minimum>-1000</relative_minimum>
+                                        <type>0</type>
+                                    </scale>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
+                                </y_axis>
+                            </axes>
+                            <color>
+                                <custom_color>#000000</custom_color>
+                                <type>0</type>
+                            </color>
+                            <data>
+                                <circular_buffer_capacity>1000</circular_buffer_capacity>
+                                <time_frame_length>10</time_frame_length>
+                                <type>0</type>
+                            </data>
+                            <style>
+                                <lines_interpolate>false</lines_interpolate>
+                                <pen_style>1</pen_style>
+                                <pen_width>2</pen_width>
+                                <render_antialias>false</render_antialias>
+                                <steps_invert>false</steps_invert>
+                                <sticks_baseline>0</sticks_baseline>
+                                <sticks_orientation>2</sticks_orientation>
+                                <type>0</type>
+                            </style>
+                            <subscriber_queue_size>100</subscriber_queue_size>
+                            <title>y_filtered</title>
+                        </curve_1>
+                        <curve_2>
                             <axes>
                                 <x_axis>
                                     <field>header/stamp</field>
@@ -249,7 +351,7 @@
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
                             <title>des_y</title>
-                        </curve_1>
+                        </curve_2>
                     </curves>
                     <legend>
                         <visible>true</visible>
@@ -287,11 +389,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_vel</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/x</field>
+                                    <field>lin_vel_filtered/x</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -300,8 +402,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_vel</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -324,7 +426,7 @@
                                 <type>0</type>
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
-                            <title>x</title>
+                            <title>x_filtered</title>
                         </curve_0>
                         <curve_1>
                             <axes>
@@ -412,11 +514,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_vel</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/y</field>
+                                    <field>lin_vel_filtered/y</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -425,12 +527,12 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/estimated_vel</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/estimated_state</topic>
+                                    <type>waverider_chomp_msgs/EstimatedState</type>
                                 </y_axis>
                             </axes>
                             <color>
-                                <custom_color>#729fcf</custom_color>
+                                <custom_color>#000000</custom_color>
                                 <type>0</type>
                             </color>
                             <data>
@@ -449,7 +551,7 @@
                                 <type>0</type>
                             </style>
                             <subscriber_queue_size>100</subscriber_queue_size>
-                            <title>y</title>
+                            <title>y_filtered</title>
                         </curve_0>
                         <curve_1>
                             <axes>
@@ -481,7 +583,7 @@
                                 </y_axis>
                             </axes>
                             <color>
-                                <custom_color>#204a87</custom_color>
+                                <custom_color>#a40000</custom_color>
                                 <type>0</type>
                             </color>
                             <data>
@@ -539,11 +641,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_target</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/x</field>
+                                    <field>des_lin_acc_target/x</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -552,8 +654,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_target</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -590,11 +692,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_waverider</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/x</field>
+                                    <field>des_lin_acc_waverider/x</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -603,8 +705,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_waverider</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -618,7 +720,7 @@
                             </data>
                             <style>
                                 <lines_interpolate>false</lines_interpolate>
-                                <pen_style>4</pen_style>
+                                <pen_style>2</pen_style>
                                 <pen_width>2</pen_width>
                                 <render_antialias>false</render_antialias>
                                 <steps_invert>false</steps_invert>
@@ -641,11 +743,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_final</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/x</field>
+                                    <field>des_lin_acc_final/x</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -654,8 +756,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_final</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -669,8 +771,8 @@
                             </data>
                             <style>
                                 <lines_interpolate>false</lines_interpolate>
-                                <pen_style>1</pen_style>
-                                <pen_width>3</pen_width>
+                                <pen_style>2</pen_style>
+                                <pen_width>2</pen_width>
                                 <render_antialias>false</render_antialias>
                                 <steps_invert>false</steps_invert>
                                 <sticks_baseline>0</sticks_baseline>
@@ -715,11 +817,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_target</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/y</field>
+                                    <field>des_lin_acc_target/y</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -728,8 +830,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_target</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -766,11 +868,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_waverider</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/y</field>
+                                    <field>des_lin_acc_waverider/y</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -779,8 +881,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_waverider</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -794,7 +896,7 @@
                             </data>
                             <style>
                                 <lines_interpolate>false</lines_interpolate>
-                                <pen_style>4</pen_style>
+                                <pen_style>2</pen_style>
                                 <pen_width>2</pen_width>
                                 <render_antialias>false</render_antialias>
                                 <steps_invert>false</steps_invert>
@@ -817,11 +919,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_final</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field>vector/y</field>
+                                    <field>des_lin_acc_final/y</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -830,8 +932,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/waverider_planner/des_acc_final</topic>
-                                    <type>geometry_msgs/Vector3Stamped</type>
+                                    <topic>/waverider_planner/des_acc_calc</topic>
+                                    <type>waverider_chomp_msgs/DesiredLinearAccelerationCalculation</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -845,8 +947,8 @@
                             </data>
                             <style>
                                 <lines_interpolate>false</lines_interpolate>
-                                <pen_style>1</pen_style>
-                                <pen_width>3</pen_width>
+                                <pen_style>2</pen_style>
+                                <pen_width>2</pen_width>
                                 <render_antialias>false</render_antialias>
                                 <steps_invert>false</steps_invert>
                                 <sticks_baseline>0</sticks_baseline>

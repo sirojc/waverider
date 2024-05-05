@@ -1,0 +1,5 @@
+std_msgs/Header header
+
+waverider_chomp_msgs/Vector2 des_lin_acc_target
+waverider_chomp_msgs/Vector2 des_lin_acc_waverider
+waverider_chomp_msgs/Vector2 des_lin_acc_final

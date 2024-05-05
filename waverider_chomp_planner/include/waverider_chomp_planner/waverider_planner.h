@@ -14,7 +14,10 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <navigation_msgs/PoseStamped.h>
-#include <waverider_chomp_msgs/FloatStamped.h>
+#include <waverider_chomp_msgs/Vector2.h>
+#include <waverider_chomp_msgs/EstimatedState.h>
+#include <waverider_chomp_msgs/DesiredLinearAccelerationCalculation.h>
+#include <waverider_chomp_msgs/DesiredYawVelocityCalculation.h>
 
 // policies
 #include <rmpcpp/policies/simple_target_policy.h>
@@ -44,7 +47,7 @@ using PlanningFeedbackPtr = waverider_chomp_msgs::PlanToGoalWaveriderFeedbackPtr
 class Planner {
 public:
   Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t, std::string planner_frame,
-          int n_past_elements_pos, int n_past_elements_vel, int n_past_elements_acc,
+          int n_past_elements_pos, int n_past_elements_vel, int n_past_elements_acc, int n_past_elements_des_vel_yaw,
           bool limit_acc_change, bool load_map_from_file);
   ~Planner();
 
@@ -89,21 +92,18 @@ private:
 
   ros::Publisher pub_twist_commands_;
   ros::Subscriber sub_wavemap_;
+  ros::Publisher pub_occupancy_;
+  ros::Subscriber sub_twist_mux_;
 
   // debugging/ visualization
   ros::Publisher pub_waverider_obstacles_;
+
+  ros::Publisher pub_estimated_state_;
   ros::Publisher pub_des_pos_;
   ros::Publisher pub_des_vel_;
-  ros::Publisher pub_des_acc_target_;
-  ros::Publisher pub_des_acc_waverider_;
-  ros::Publisher pub_des_acc_final_;
-  ros::Publisher pub_des_est_yaw_;
-  ros::Publisher pub_diff_heading_;
-  ros::Publisher pub_estimated_pos_;
-  ros::Publisher pub_estimated_vel_;
-  ros::Publisher pub_estimated_acc_;
-  ros::Publisher pub_occupancy_;
-  ros::Subscriber sub_twist_mux_;
+
+  ros::Publisher pub_des_acc_calc_;
+  ros::Publisher pub_des_yaw_vel_calc_;
 
   // policies
   rmpcpp::SimpleTargetPolicy<rmpcpp::Space<2>> target_policy_;
@@ -147,6 +147,9 @@ private:
   std::deque<double> past_vel_x_;
   std::deque<double> past_vel_y_;
   Eigen::Vector2d prev_vel_;
+
+  int n_past_elements_des_vel_yaw_;
+  std::deque<double> past_des_vel_yaw_;
 
   int n_past_elements_acc_;
   std::deque<double> past_acc_x_;

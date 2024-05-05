@@ -33,7 +33,10 @@ add_message_files(
   FILES
     PlannerType.msg
     RobotState.msg
-    FloatStamped.msg
+    Vector2.msg
+    EstimatedState.msg
+    DesiredLinearAccelerationCalculation.msg
+    DesiredYawVelocityCalculation.msg
 )
 
 generate_messages(
