@@ -5,12 +5,12 @@ target_policy:
   factor_A: 8.0
 
 waverider_policy:
-  r: 1.0
+  r: 1.2
   c: 1.0
   eta_rep: 9.0
-  nu_rep: 0.9
-  eta_damp: 16.0
-  nu_damp: 2.5
+  nu_rep: 1.0
+  eta_damp: 15.0
+  nu_damp: 1.5
   enable_repulsor: true
   enable_damper: true
   occupancy_threshold: 0.01
