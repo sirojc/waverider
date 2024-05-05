@@ -6,17 +6,17 @@ target_policy:
 
 waverider_policy:
   r: 1.2
-  c: 1.0
+  c: 0.1
   eta_rep: 9.0
   nu_rep: 1.0
-  eta_damp: 15.0
+  eta_damp: 100.0
   nu_damp: 1.5
   enable_repulsor: true
   enable_damper: true
   occupancy_threshold: 0.01
-  run_all_levels: false
+  run_all_levels: true
   lowest_level_radius: 2.0 # range that obstacles are considered, only used if use_only_lowest_level=true, otherwise res. dep. distance
   use_only_lowest_level: true # if true: all at highest available (leaf) resolution
 
 velocity_controller:
-  k: 0.3
+  k: 0.1

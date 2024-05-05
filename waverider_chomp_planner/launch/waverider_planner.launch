@@ -23,7 +23,7 @@
      default="0.5"
      doc="Filter time for acceleration."/>
   <arg name="n_past_seconds_des_yaw"
-     default="0.5"
+     default="2.0"
      doc="Filter time for des yaw."/>
   <arg name="load_map_from_file"
      default="false"

@@ -314,7 +314,6 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
 
   // p controller for jaw twist
   double yaw_velocity_unfiltered = k_vel_ctrl_ * diff_heading;
-  std::cout << "---------------max_angular_vel_: " << max_angular_vel_ << std::endl;
   yaw_velocity_unfiltered = std::min(std::max(yaw_velocity_unfiltered, -max_angular_vel_), max_angular_vel_); // ensure within range
 
   if (past_des_vel_yaw_.size() == n_past_elements_des_vel_yaw_) {
@@ -778,7 +777,7 @@ int main(int argc, char** argv)
   nh_private.getParam("n_past_seconds_pos", n_past_seconds_pos);
   nh_private.getParam("n_past_seconds_vel", n_past_seconds_vel);
   nh_private.getParam("n_past_seconds_acc", n_past_seconds_acc);
-  nh_private.getParam("n_past_seconds_des_yaw", n_past_seconds_acc);
+  nh_private.getParam("n_past_seconds_des_yaw", n_past_seconds_des_yaw);
   std::cout << "n_past_seconds_pos: " << n_past_seconds_pos << std::endl;
   std::cout << "n_past_seconds_vel: " << n_past_seconds_vel << std::endl;
   std::cout << "n_past_seconds_acc: " << n_past_seconds_acc << std::endl;
