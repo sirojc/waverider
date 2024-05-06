@@ -7,7 +7,7 @@ target_policy:
 waverider_policy:
   r: 1.2
   c: 0.1
-  eta_rep: 9.0
+  eta_rep: 9.2
   nu_rep: 1.0
   eta_damp: 100.0
   nu_damp: 1.5
