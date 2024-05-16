@@ -2,8 +2,6 @@
 
 #include <iostream>
 
-#include <unistd.h>
-
 #include <Eigen/Cholesky>
 #include <tracy/Tracy.hpp>
 
@@ -271,7 +269,6 @@ void ChompOptimizer::doGradientDescent(ChompTrajectory* traj) {
       position_msg.z = height_robot_;
     }
     curr_traj_pub_.publish(trajectory_msg);
-    // sleep(1);
 
     cost = getCost(*traj);
     getGradient(*traj, &gradient);
