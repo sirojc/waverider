@@ -35,9 +35,9 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
   if (load_map_from_file) {
     ROS_INFO("loading map from file");
     // Load the occupancy map
-      // wavemap::io::fileToMap("/home/nicole/ros_rebased/catkin_ws/src/alma_rsl/dependencies/anymal_rsl/dependencies/wavemap/data/example_maps/newer_college_mine_5cm.wvmp", occupancy_map_);
-      // wavemap::io::fileToMap("/home/nicole/ros_rebased/catkin_ws/src/alma_rsl/dependencies/anymal_rsl/dependencies/wavemap/data/anymal/map_lab.wvmp", occupancy_map_);
-      wavemap::io::fileToMap("/home/nicole/ros_rebased/catkin_ws/src/alma_rsl/dependencies/anymal_rsl/dependencies/wavemap/data/anymal/slalom.wvmp", occupancy_map_);
+    // wavemap::io::fileToMap("/home/nicole/ros_rebased/catkin_ws/src/alma_rsl/dependencies/anymal_rsl/dependencies/wavemap/data/example_maps/newer_college_mine_5cm.wvmp", occupancy_map_);
+    // wavemap::io::fileToMap("/home/nicole/ros_rebased/catkin_ws/src/alma_rsl/dependencies/anymal_rsl/dependencies/wavemap/data/anymal/map_lab.wvmp", occupancy_map_);
+    wavemap::io::fileToMap("/home/nicole/ros_rebased/catkin_ws/src/alma_rsl/dependencies/anymal_rsl/dependencies/wavemap/data/anymal/slalom.wvmp", occupancy_map_);
     CHECK_NOTNULL(occupancy_map_);
 
     // Publish the occupancy map
@@ -75,9 +75,6 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, bool load_map_f
   
   chomp_.setDistanceFunction(distance_getter_esdf_);
 
-  // Initialize Waverider
-  // TODO: WHAT NEEDS TO BE HERE?
-
   ROS_INFO("Ready for queries.");
 }
 
@@ -95,7 +92,6 @@ bool Planner::checkTrajCollision(const Eigen::MatrixXd& trajectory) const {
     if (planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP) {
       min_distance = distance_getter_esdf_(position);
       if (min_distance <= robot_radius_) {
-        std::cout << "Collision at position: " << position << " with distance: " << min_distance << std::endl;
         is_collision_free = false;
         break;
       }
@@ -170,12 +166,12 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
   bool is_collision_free = checkTrajCollision(traj);
 
   if (!is_collision_free) {
-    LOG(INFO) << "Solution trajectory is NOT collision free";
+    ROS_INFO("Solution trajectory is NOT collision free");
     publishLocalPlannerFeedback(Feedback::NO_SOLUTION);
     planning_ = false;
     return;
   } else {
-    LOG(INFO) << "Solution trajectory is collision free";
+    ROS_INFO("Solution trajectory is collision free");
     publishLocalPlannerFeedback(Feedback::FOUND_SOLUTION);
   
     // get the full trajectory
@@ -247,6 +243,8 @@ void Planner::getTrajectory(const geometry_msgs::Pose& start,
 
     // Send path as feedback
     feedback_->path_optimized = optimized_path;
+
+    ROS_INFO("Published solution");
     publishLocalPlannerFeedback(Feedback::PUBLISHED_SOLUTION);
   }
 
@@ -268,13 +266,11 @@ Eigen::MatrixXd Planner::getChompTrajectory(const geometry_msgs::Pose& start,
 
 Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start,
                                                          const geometry_msgs::Pose& goal) {
-  std::cout << "1" << std::endl;
   // rest to rest trajectories!
   rmpcpp::State<3> start_r3;
   start_r3.pos_ = Eigen::Vector3d(start.position.x, start.position.y, start.position.z);
   start_r3.vel_ = Eigen::Vector3d::Zero();
   start_r3.acc_ = Eigen::Vector3d::Zero();
-  std::cout << "2" << std::endl;
 
   // configure policies
   Eigen::Vector3d end(goal.position.x, goal.position.y, goal.position.z);
@@ -282,7 +278,6 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
   target_policy.setTuning(10, 15, 0.01);
   target_policy.setTarget(end);
   target_policy.setA(Eigen::Matrix3d::Identity()*10);
-  std::cout << "3" << std::endl;
 
   // TODO: move this to member var.
   waverider::WaveriderPolicy waverider_policy;
@@ -292,7 +287,6 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
     waverider_policy.obstacle_filter_.lowest_level_radius_ = flat_res_radius_;
     waverider_policy.obstacle_filter_.use_only_lowest_level_ = true;
   }
-  std::cout << "4" << std::endl;
 
   std::vector<Eigen::Vector3d> trajectory_pieces;
 
@@ -302,7 +296,6 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
   Eigen::Vector3d last_updated_pos = {-10000.0, -10000.0, -10000.0};
   int i =0;
 
-  std::cout << "5" << std::endl;
   // lambda to make victor happy
   // tiny bit more efficient -> victor only slightly angry/disappointed.
   auto policy_sum = [&](const rmpcpp::State<3>& state) {
@@ -331,24 +324,18 @@ Eigen::MatrixXd Planner::getWaveriderTrajectory(const geometry_msgs::Pose& start
     // return acceleration
     return (target_result+waverider_result).f_;
   };
-  std::cout << "6" << std::endl;
 
   bool got_to_rest =
       integrator.integrateSteps(policy_sum, max_integration_steps_);
 
-  std::cout << "7" << std::endl;
   bool success = got_to_rest;
 
-  std::cout << "success: " << success << std::endl;
-
-  std::cout << "8" << std::endl;
   Eigen::MatrixXd trajectory(trajectory_pieces.size(), 2);
   for (int i = 0; i < trajectory_pieces.size(); ++i) {
     trajectory(i, 0) = trajectory_pieces[i][0];
     trajectory(i, 1) = trajectory_pieces[i][1];
   }
 
-  std::cout << "9" << std::endl;
   return trajectory;
 }
 
@@ -477,7 +464,6 @@ bool Planner::setPlannerTypeService(waverider_chomp_msgs::SetPlannerType::Reques
 
 
 void Planner::visualizeTrajectory(const Eigen::MatrixXd& trajectory, bool is_collision_free) const {
-  LOG(INFO) << "Publishing trajectory";
   visualization_msgs::Marker trajectory_msg;
   trajectory_msg.header.frame_id = planner_frame_;
   trajectory_msg.header.stamp = ros::Time::now();
@@ -589,8 +575,6 @@ void Planner::goalCB() {
   auto plan_req = get_path_action_srv_.acceptNewGoal();
   planning_ = true;
 
-  std::cout << "---------------- plan_req: " << std::endl << *plan_req << std::endl;
-
   int n_elements = plan_req->path.path_segments.size();
   navigation_msgs::PoseStamped start_pose = plan_req->path.path_segments[0].goal;
   navigation_msgs::PoseStamped goal_pose = plan_req->path.path_segments.back().goal;
@@ -644,9 +628,6 @@ void Planner::goalCB() {
     goal_pose.pose = goal_pose_stamped.pose;
   }
 
-  std::cout << "---------------- start_pose: " << std::endl << start_pose << std::endl;
-  std::cout << "---------------- goal_pose: " << std::endl << goal_pose << std::endl;
-
   // update map to get newest data
   wavemap::Point3D center_point((start_pose.pose.position.x + goal_pose.pose.position.x) / 2.0,
                                 (start_pose.pose.position.y + goal_pose.pose.position.y) / 2.0,
@@ -654,13 +635,12 @@ void Planner::goalCB() {
   wavemap::Point2D radius(start_pose.pose.position.x - center_point(0),
                           start_pose.pose.position.y - center_point(1));
   float distance = radius.norm() + 3;
-  std::cout << "--------- before updateMap" << std::endl;
   if (!updateMap(planner_type_.type == waverider_chomp_msgs::PlannerType::CHOMP, center_point, distance)) {
+    ROS_ERROR("Map not avaliable yet");
     publishLocalPlannerFeedback(Feedback::NO_MAP);
     planning_ = false;
     return;
   }
-  std::cout << "--------- after updateMap" << std::endl;
 
   // adapt robot height
   height_robot_ = start_pose.pose.position.z;
@@ -671,7 +651,6 @@ void Planner::goalCB() {
     if (min_distance_start < robot_radius_) {
       publishLocalPlannerFeedback(Feedback::INVALID_START);
       ROS_INFO("Not planning, start pose invalid");
-      std::cout << "min_distance_start: " << min_distance_start << ", robot_radius_: " << robot_radius_ << std::endl;
       planning_ = false;
       return;
     }
@@ -680,15 +659,10 @@ void Planner::goalCB() {
     if (min_distance_goal < robot_radius_) {
       publishLocalPlannerFeedback(Feedback::INVALID_GOAL);
       ROS_INFO("Not planning, goal pose invalid");
-      std::cout << "min_distance_goal: " << min_distance_goal << ", robot_radius_: " << robot_radius_ << std::endl;
       planning_ = false;
       return;
     }
-  } else {
-    // TODO: HOW TO CHECK IF USING WAVERIDER
   }
-
-  std::cout << "--------- local_guidance_mode: " << plan_req->path.path_segments[0].local_guidance_mode << std::endl;
 
   getTrajectory(start_pose.pose, goal_pose.pose, start_pose.ignore_orientation, start_pose.tol, plan_req->path.path_segments[0].local_guidance_mode);
 }
@@ -711,15 +685,12 @@ int main(int argc, char** argv)
 
   bool load_map_from_file = false;
   nh_private.getParam("load_map_from_file", load_map_from_file);
-  std::cout << "load_map_from_file: " << load_map_from_file << std::endl;
 
   std::string frame;
   nh_private.getParam("frame", frame);
-  std::cout << "planner_frame: " << frame << std::endl;
 
   float propagation_distance;
   nh_private.getParam("propagation_distance", propagation_distance);
-  std::cout << "propagation_distance: " << propagation_distance << std::endl;
 
   waverider_chomp_planner::Planner planner(nh, nh_private, load_map_from_file, frame, propagation_distance);
   ros::spin();

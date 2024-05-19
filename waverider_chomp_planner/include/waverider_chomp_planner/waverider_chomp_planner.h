@@ -121,9 +121,7 @@ private:
   
   // robot
   const std::string planner_frame_ = "map";
-  double height_robot_ = 0.65; // TODO: get from start
-  const double des_lin_velocity_ = 0.1; // TODO: CHECK WHAT THIS SHOULD BE
-  const double des_ang_velocity_ = 0.2;
+  double height_robot_ = 0.65;
 
   // planner
   bool load_map_from_file_;

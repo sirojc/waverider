@@ -55,7 +55,6 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
 
     // velocity control
     k_vel_ctrl_ = param_io::param<double>(nh_, "/waverider_planner/velocity_controller/k", 0.5);
-    std::cout << "*********************** initializing yaw_contrl with: k_vel_ctrl_=" << k_vel_ctrl_ << std::endl;
 
     // policy initialization
     double alpha = param_io::param<double>(nh_, "/waverider_planner/target_policy/alpha", 1.0);
@@ -63,7 +62,6 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     double gamma = param_io::param<double>(nh_, "/waverider_planner/target_policy/gamma", 0.001);
     double factor_A = param_io::param<double>(nh_, "/waverider_planner/target_policy/factor_A", 10.0);
 
-    std::cout << "*********************** initializing target_policy_ with: alpha=" << alpha << ", beta=" << beta << ", gamma=" << gamma << ", factor_A=" << factor_A << std::endl;
     target_policy_.setTuning(alpha, beta, gamma);
     target_policy_.setA(Eigen::Matrix2d::Identity() * factor_A);
 
@@ -77,9 +75,6 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     tuning.enable_repulsor = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/enable_repulsor", true);
     tuning.enable_damper = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/enable_damper", true);
 
-    std::cout << "*********************** initializing PolicyTuning for waverider_policy_ with: r=" << tuning.r << ", c=" << tuning.c << ", eta_rep=" << tuning.eta_rep
-          << ", nu_rep=" << tuning.nu_rep << ", eta_damp=" << tuning.eta_damp << ", nu_damp=" << tuning.nu_damp
-          << ", enable_damper=" << tuning.enable_damper << ", enable_repulsor=" << tuning.enable_repulsor << std::endl; 
     waverider_policy_.updateTuning(tuning); 
 
     double occupancy_threshold = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/occupancy_threshold", 0.01);
@@ -87,8 +82,6 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     double lowest_level_radius = param_io::param<double>(nh_, "/waverider_planner/waverider_policy/lowest_level_radius", 1.0);
     bool use_only_lowest_level = param_io::param<bool>(nh_, "/waverider_planner/waverider_policy/use_only_lowest_level", true);
     
-    std::cout << "*********************** initializing other param waverider: occupancy_threshold=" << occupancy_threshold << ", run_all_levels=" << run_all_levels
-              << ", lowest_level_radius=" << lowest_level_radius << ", use_only_lowest_level=" << use_only_lowest_level << std::endl;
     waverider_policy_.setOccupancyThreshold(occupancy_threshold);
     waverider_policy_.run_all_levels_ = run_all_levels;
     waverider_policy_.obstacle_filter_.lowest_level_radius_ = lowest_level_radius;
@@ -100,15 +93,8 @@ Planner::~Planner() {
 }
 
 bool Planner::isPositionTargetReached() {
-  // std::cout << "-------------------------------------------- isPositionTargetReached" << std::endl;
   if(!reached_pos_) {
-    // std::cout << "------ des_position_: " << std::endl << des_position_ << std::endl;
-    // std::cout << "------ curr_state_.pos_: " << std::endl << curr_state_.pos_.head(2) << std::endl;
-
     Eigen::Vector2d distance(des_position_[0] - curr_state_.pos_[0], des_position_[1] - curr_state_.pos_[1]);
-
-    // std::cout << "------ distance: " << std::endl << distance.norm() << std::endl;
-    // std::cout << "------ tol_position_: " << std::endl << tol_position_ << std::endl;
 
     if (distance.norm() < tol_position_) {
       reached_pos_ = true;
@@ -122,18 +108,10 @@ bool Planner::isPositionTargetReached() {
 }
 
 bool Planner::isYawTargetReached() {
-  // std::cout << "-------------------------------------------- isYawTargetReached" << std::endl;
-
-  // std::cout << "------ des_yaw_ (converted to deg): " << std::endl << des_yaw_ * 180.0 / M_PI << std::endl;
-  // std::cout << "------ curr_yaw_ (converted to deg): " << std::endl << curr_yaw_ * 180.0 / M_PI << std::endl;
-
   double higher_angle = std::max(curr_yaw_, des_yaw_);
   double lower_angle = std::min(curr_yaw_, des_yaw_);
 
   double distance = std::fmod(higher_angle - lower_angle, M_PI);
-
-  // std::cout << "------ distance: " << std::endl << distance << std::endl;
-  // std::cout << "------ tol_rotation_: " << std::endl << tol_rotation_ << std::endl;
 
   if (distance < tol_rotation_) {
     return true;
@@ -156,15 +134,9 @@ geometry_msgs::TwistStamped Planner::transform_twist(const geometry_msgs::TwistS
   tf2::fromMsg(initial_twist.twist.linear, lin_vel);
   tf2::fromMsg(initial_twist.twist.angular, ang_vel);
 
-  // std::cout << "------ lin_vel: " << std::endl << lin_vel.x() << ", " << lin_vel.y() << ", " << lin_vel.z() << std::endl;
-  // std::cout << "------ ang_vel: " << std::endl << ang_vel.x() << ", " << ang_vel.y() << ", " << ang_vel.z() << std::endl;
-
   tf2::Vector3 transformed_lin_vel, transformed_ang_vel;
   transformed_lin_vel = tf2::quatRotate(rotation, lin_vel);
   transformed_ang_vel = tf2::quatRotate(rotation, ang_vel);
-
-  // std::cout << "------ transformed_lin_vel: " << std::endl << transformed_lin_vel.x() << ", " << transformed_lin_vel.y() << ", " << transformed_lin_vel.z() << std::endl;
-  // std::cout << "------ transformed_ang_vel: " << std::endl << transformed_ang_vel.x() << ", " << transformed_ang_vel.y() << ", " << transformed_ang_vel.z() << std::endl;
 
   target_twist_transformed.twist.linear = tf2::toMsg(transformed_lin_vel);
   target_twist_transformed.twist.linear.z = 0.0;
@@ -190,34 +162,20 @@ double Planner::getMedian(const std::deque<double>& data) {
 }
 
 Eigen::Vector2d Planner::getLinearTargetAcceleration() {
-  //  "----------------------------------------------------- getLinearTargetAcceleration" << std::endl;
-  //  "------ curr_state_.pos_: " << std::endl << curr_state_.pos_ << std::endl;
-  //  "------ curr_state_.vel_: " << std::endl << curr_state_.vel_ << std::endl;
-  //  "------ curr_state_.acc_: " << std::endl << curr_state_.acc_ << std::endl;
-
   // evaluate target policy
   rmpcpp::PolicyValue<2> target_result = target_policy_.evaluateAt(curr_state_);
-  //  "------ target_result acc: " << std::endl << target_result.f_ << std::endl;
 
   // evaluate waverider policy
   rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.4);
-  //  "------ waverider_result acc: " << std::endl << waverider_result.f_ << std::endl;
-  //  "------ waverider_result A: " << std::endl << waverider_result.A_ << std::endl;
-  // std::cout << "------ scaled waverider_result acc: deactivated" << std::endl;
 
   // get target acceleration
-  // std::vector<rmpcpp::PolicyValue<2>> policies = {target_result};
   std::vector<rmpcpp::PolicyValue<2>> policies = {target_result, waverider_result};
   rmpcpp::PolicyValue<2> final_policy = rmpcpp::PolicyValue<2>::sum(policies);
   Eigen::Vector2d acceleration = final_policy.f_;
 
-  //  "------ initial accelerations_x_y: " << std::endl << acceleration[0] << ", " << acceleration[1] << std::endl;
-
   double scaling = std::min({max_linear_acc_ / std::abs(acceleration[0]), max_linear_acc_ / std::abs(acceleration[1]), 1.0});
   acceleration[0] *= scaling;
   acceleration[1] *= scaling;
-
-  //  "------ cut accelerations_x_y: " << std::endl << acceleration[0] << ", " << acceleration[1] << std::endl;
 
   Eigen::Vector2d scaled_target_acc = rmpcpp::PolicyValue<2>::pinv(final_policy.A_) * target_result.A_ * target_result.f_;
   Eigen::Vector2d scaled_waverider_acc = rmpcpp::PolicyValue<2>::pinv(final_policy.A_) * waverider_result.A_ * waverider_result.f_;
@@ -241,44 +199,24 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
 }
 
 Eigen::Vector2d Planner::getLinearTargetVelocity(const Eigen::Vector2d& des_accelerations) {
-  // std::cout << "----------------------------------------------------- getLinearTargetVelocity" << std::endl;
-
-  // trapezoidal rule
-  // std::cout << "------ curr_state_.vel_: " << std::endl << curr_state_.vel_ << std::endl;
-  // std::cout << "------ curr_state_.acc_: " << std::endl << curr_state_.acc_ << std::endl;
-  // std::cout << "------ des_accelerations: " << std::endl << des_accelerations << std::endl;
-
   Eigen::Vector2d target_velocity;
   if(limit_acc_change_) {
-    // std::cout << "------ acc. change is limited" << std::endl;
     target_velocity = curr_state_.vel_ + (delta_t_ / 2.0) * (des_accelerations + curr_state_.acc_);
   } else {
-    // std::cout << "------ acc. change is NOT limited" << std::endl;
     target_velocity = curr_state_.vel_ + delta_t_ * des_accelerations;
   }
-
-  // std::cout << "------ initial target_velocity: " << std::endl << target_velocity << std::endl;
 
   double scaling = std::min({max_linear_vel_ / std::abs(target_velocity[0]), max_linear_vel_ / std::abs(target_velocity[1]), 1.0});
   target_velocity[0] *= scaling;
   target_velocity[1] *= scaling;
 
-  // std::cout << "------ final target_velocity: " << std::endl << target_velocity << std::endl;
-
   return target_velocity;
 }
 
 double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
-  // des_heading = std::fmod(des_heading, 2 * M_PI);
-  // curr_heading = std::fmod(curr_heading, 2 * M_PI);
-
-  // std::cout << "----------------------------------------------------- getTargetYawVelocity" << std::endl;
   // current shortest angle
   double diff_heading = des_heading - curr_heading;
 
-  // std::cout << "------ des_heading: " << std::endl << des_heading << "rad = " << des_heading * 180.0 / M_PI << "deg" << std::endl;
-  // std::cout << "------ curr_heading: " << std::endl << curr_heading << "rad = " << curr_heading * 180.0 / M_PI << "deg" << std::endl;
-  
   if (diff_heading > M_PI) {
     diff_heading -= 2 * M_PI;
   } else if(diff_heading < -M_PI) {
@@ -289,17 +227,11 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
     prev_diff_heading_ = new double(diff_heading);
   }
 
-  // std::cout << "------ prev_diff_heading_: " << std::endl << *prev_diff_heading_ << "rad = " << *prev_diff_heading_ * 180.0 / M_PI << "deg" << std::endl;
-  // std::cout << "------ diff_heading before: " << std::endl << diff_heading << "rad = " << diff_heading * 180.0 / M_PI << "deg" << std::endl;
-  
   if (abs(diff_heading) > 2.6 && diff_heading * (*prev_diff_heading_) < 0) {
-    // std::cout << "************************** DIFFERENT SIGNS, CHECK IF SWITCH REQUIRED" << std::endl;
     double diff = std::fmod(std::max(diff_heading, *prev_diff_heading_) - std::min(diff_heading, *prev_diff_heading_), M_PI);
     diff = std::min(diff, M_PI - diff);
-    // std::cout << "------ diff: " << std::endl << diff << "rad = " << diff * 180.0 / M_PI << "deg" << std::endl;
 
     if (diff < M_PI / 2) {
-      // std::cout << "******************************************************************************** SWITCH TO INITIAL SIGN" << std::endl;
       if(diff_heading < 0) {
         diff_heading += 2 * M_PI;
       } else {
@@ -307,10 +239,8 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
       }
     }
   }
-  // std::cout << "------ diff_heading after: " << std::endl << diff_heading << "rad = " << diff_heading * 180.0 / M_PI << "deg" << std::endl;
 
   *prev_diff_heading_ = diff_heading;
-
 
   // p controller for jaw twist
   double yaw_velocity_unfiltered = k_vel_ctrl_ * diff_heading;
@@ -322,9 +252,6 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
   past_des_vel_yaw_.push_back(yaw_velocity_unfiltered);
 
   double yaw_velocity = getMedian(past_des_vel_yaw_);
-
-  // std::cout << "------ final yaw_velocity: " << std::endl << yaw_velocity << std::endl;
-
 
   waverider_chomp_msgs::DesiredYawVelocityCalculation yaw_vel_calc_msg;
   yaw_vel_calc_msg.header.stamp = ros::Time::now();
@@ -338,11 +265,10 @@ double Planner::getTargetYawVelocity(double des_heading, double curr_heading) {
 
   pub_des_yaw_vel_calc_.publish(yaw_vel_calc_msg);
 
-  return diff_heading;
+  return yaw_velocity;
 }
 
 void Planner::TargetTwistCommandApproach() {
-  // std::cout << "-------------------------------------------- TargetTwistCommandApproach" << std::endl;
   // get desired x,y accelerations
   Eigen::Vector2d accelerations_x_y = getLinearTargetAcceleration();
 
@@ -368,7 +294,6 @@ void Planner::TargetTwistCommandApproach() {
 }
 
 void Planner::TargetTwistCommandFinalRotation() {
-  // std::cout << "-------------------------------------------- TargetTwistCommandFinalRotation" << std::endl;
   // get yaw velocity
   double yaw_velocity = getTargetYawVelocity(des_yaw_, curr_yaw_);
 
@@ -387,8 +312,6 @@ void Planner::TargetTwistCommandFinalRotation() {
 }
 
 void Planner::publishTargetTwist(const geometry_msgs::TwistStamped target_twist_planner_frame) {
-  // std::cout << "-------------------------------------------- publishTargetTwist" << std::endl;
-
   assert(target_twist_planner_frame.header.frame_id == planner_frame_);
   pub_des_vel_.publish(target_twist_planner_frame);
 
@@ -398,23 +321,11 @@ void Planner::publishTargetTwist(const geometry_msgs::TwistStamped target_twist_
     transformStamped = tf_buffer_.lookupTransform("base", target_twist_planner_frame.header.frame_id, ros::Time(0));
   } catch (tf2::TransformException &ex) {
     ROS_ERROR("%s",ex.what());
-
-    // planning_ = false;
-    // reached_pos_ = false;
-
-    // Goal result;
-    // result.success = false;
-    // get_path_action_srv_.setAborted(result);
-
     return;
   }
 
-  // std::cout << "------ target_twist_planner_frame: " << std::endl << target_twist_planner_frame << std::endl;
-  // std::cout << "------ transformStamped: " << std::endl << transformStamped << std::endl;
-
   geometry_msgs::TwistStamped target_twist_base = transform_twist(target_twist_planner_frame, "base", transformStamped);
   
-  // std::cout << "------ target_twist_base: " << std::endl << target_twist_base << std::endl;
   assert(target_twist_base.header.frame_id == "base");
   pub_twist_commands_.publish(target_twist_base);
 }
@@ -436,8 +347,6 @@ void Planner::callbackTwistMux(const geometry_msgs::TwistStamped& msg) {
 }
 
 bool Planner::updateObstacles() {
-  //std::cout << "---------------------------------------------------------------------- updateObstacles" << std::endl;
-
   // check if occupancy_map_ is set
   if (!occupancy_map_) {
     ROS_ERROR("Occupancy map not initialized yet.");
@@ -461,7 +370,6 @@ bool Planner::updateObstacles() {
 }
 
 bool Planner::updateCurrentState() {
-  // std::cout << "-------------------------------------------- updateCurrentState" << std::endl;
   geometry_msgs::TransformStamped transformStamped;
 
   geometry_msgs::PoseStamped current_base_pose_base_frame;
@@ -474,30 +382,17 @@ bool Planner::updateCurrentState() {
   double current_time = 0.0;
   try{
     do {
-      // std::cout << "updateCurrentState: waiting for transform" << std::endl;
       transformStamped = tf_buffer_.lookupTransform(planner_frame_, current_base_pose_base_frame.header.frame_id, ros::Time(0));
       current_time = transformStamped.header.stamp.sec + (transformStamped.header.stamp.nsec  / 1e9);
     } while (current_time == last_time_stamp_);
-    
-    // std::cout << "transformStamped: " << transformStamped << std::endl;
     
     tf2::doTransform(current_base_pose_base_frame, current_base_pose, transformStamped);
     assert(current_base_pose.header.frame_id == planner_frame_);
     }
   catch (tf2::TransformException &ex) {
     ROS_ERROR("%s",ex.what());
-
-    // planning_ = false;
-    // reached_pos_ = false;
-
-    // Goal result;
-    // result.success = false;
-    // get_path_action_srv_.setAborted(result);
-
     return false;
   }
-
-  //std::cout << "------ current_base_pose: " << std::endl << current_base_pose << std::endl;
 
   curr_height_ = current_base_pose.pose.position.z;
 
@@ -512,7 +407,7 @@ bool Planner::updateCurrentState() {
 
   // solution using consecutive frames
   if(past_pos_x_.size() == n_past_elements_pos_){
-    ROS_INFO_ONCE("past_pos_ initialized");
+    ROS_INFO_ONCE("past_pos initialized");
 
     prev_pos_ = curr_state_.pos_;
 
@@ -526,13 +421,7 @@ bool Planner::updateCurrentState() {
     curr_state_.pos_ = Eigen::Vector2d(getMedian(past_pos_x_), getMedian(past_pos_y_));
     curr_yaw_ = getMedian(past_yaw_);
 
-    // std::cout << std::setprecision(9) << "current_time: " << current_time << std::endl;
     delta_t_ = current_time - last_time_stamp_;
-    // std::cout << std::setprecision(9) << "delta_t_: " << std::endl << delta_t_ << std::endl;
-    
-    // if(delta_t_ < 1.0) {
-    //   return false;
-    // }
 
     last_time_stamp_  = current_time;
     
@@ -586,7 +475,6 @@ bool Planner::updateCurrentState() {
   } else {
     // initialize past_pos_
     last_time_stamp_ = transformStamped.header.stamp.sec + (transformStamped.header.stamp.nsec / 1e9);
-    //std::cout << std::setprecision(9) << "last_time_stamp_: " << std::endl << last_time_stamp_ << std::endl;
 
     past_pos_x_.push_back(current_base_pose.pose.position.x);
     past_pos_y_.push_back(current_base_pose.pose.position.y);
@@ -606,17 +494,6 @@ bool Planner::updateCurrentState() {
   // assert(past_pos_x_.size() == past_yaw_.size());
   assert(past_vel_x_.size() == past_vel_y_.size());
   assert(past_acc_x_.size() == past_acc_y_.size());
-
-  // std::cout << "-- finished calc" << std::endl;
-  // if (prev_pos_) {std::cout << "------ prev pos: " << std::endl << prev_pos_ << std::endl;}
-  // if (prev_vel_) {std::cout << "------ prev vel: " << std::endl << prev_vel_ << std::endl;}
-  // if (prev_acc_) {std::cout << "------ prev acc: " << std::endl << prev_acc_ << std::endl;}
-
-  //std::cout << "------ current height: " << std::endl << curr_height_ << std::endl;
-  // std::cout << "------ current pos: " << std::endl << curr_state_.pos_ << std::endl;
-  //std::cout << "------ current yaw (converted to deg): " << std::endl << curr_yaw_ * 180.0 / M_PI << std::endl;
-  // std::cout << "------ current vel: " << std::endl << curr_state_.vel_ << std::endl;
-  // std::cout << "------ current acc: " << std::endl << curr_state_.acc_ << std::endl;
 
   // publish desired pos
   geometry_msgs::Vector3Stamped des_pos_msg;
@@ -655,9 +532,7 @@ bool Planner::updateCurrentState() {
   pub_estimated_state_.publish(est_state_msg);
 
   // publish transformed twist mux
-  // std::cout << "------ twist base: " << std::endl << twist_mux_twist_ << std::endl;
   // geometry_msgs::TwistStamped target_twist_planner = transform_twist(twist_mux_twist_, planner_frame_, transformStamped);
-  // std::cout << "------ twist planner: " << std::endl << target_twist_planner << std::endl;
 
   // pub_des_vel_.publish(target_twist_planner);
 
@@ -665,13 +540,11 @@ bool Planner::updateCurrentState() {
 }
 
 void Planner::run() {
-  std::cout << "------------------------------------------------------------------------------- run" << std::endl;
   if(!updateCurrentState()) {// to always have accurate pos, vel and acc.
     return;
   }
 
   if (planning_) {
-    std::cout << "---------------------------------------------------------------- planning" << std::endl;
     // update current planning env.
     if(!(updateObstacles())) {
       planning_ = false;
@@ -685,25 +558,24 @@ void Planner::run() {
 
     // while position not reached: get to desired position
     if (!isPositionTargetReached()) {
-      std::cout << "-------------------------------------------- pos not reached" << std::endl;
       TargetTwistCommandApproach();
     } else {
+      ROS_INFO_ONCE("Target position reached");
       // while position reached, yaw not reached: rotate
       if (!isYawTargetReached()) {
-        std::cout << "-------------------------------------------- pos reached, yaw not reached" << std::endl;
         TargetTwistCommandFinalRotation();
       } else {
-        std::cout << "-------------------------------------------- everything reached" << std::endl;
+        ROS_INFO_ONCE("Target yaw reached");
         planning_ = false;
         reached_pos_ = false;
 
         Goal result;
         result.success = true;
         get_path_action_srv_.setSucceeded(result);
+
+        ROS_INFO_ONCE("Planning finished successfully");
       }
     }
-  } else {
-    std::cout << "-------------------------------------------- not planning" << std::endl;
   }
 
   return;
@@ -712,13 +584,10 @@ void Planner::run() {
 // todo: this can be different! Local guidance no longer used
 void Planner::goalCB() {
   ROS_INFO("goalCB");
-  //  "--------------------------------------------------------------------------------------------------------------------- goalCB" << std::endl;
   
   // get the new goal
   auto requested_goal = get_path_action_srv_.acceptNewGoal();
   assert(requested_goal->goal.header.frame_id == planner_frame_);
-
-  std::cout << "----------------------requested_goal: " << std::endl << *requested_goal << std::endl;
 
   // set tolerances
   tol_position_ = requested_goal->goal.tol.translation;
@@ -749,7 +618,6 @@ void Planner::goalCB() {
 
 void Planner::preemptCB() {
   ROS_INFO("preemptCB");
-  //  "--------------------------------------------------------------------------------------------------------------------- preemptCB" << std::endl;
 
   // set the action state to preempted
   planning_ = false;
@@ -767,43 +635,31 @@ int main(int argc, char** argv)
 
   bool load_map_from_file = false;
   nh_private.getParam("load_map_from_file", load_map_from_file);
-  std::cout << "load_map_from_file: " << load_map_from_file << std::endl;
 
   std::string planner_frame;
   nh_private.getParam("planner_frame", planner_frame);
-  std::cout << "planner_frame: " << planner_frame.c_str() << std::endl;
 
   double n_past_seconds_pos, n_past_seconds_vel, n_past_seconds_acc, n_past_seconds_des_yaw;
   nh_private.getParam("n_past_seconds_pos", n_past_seconds_pos);
   nh_private.getParam("n_past_seconds_vel", n_past_seconds_vel);
   nh_private.getParam("n_past_seconds_acc", n_past_seconds_acc);
   nh_private.getParam("n_past_seconds_des_yaw", n_past_seconds_des_yaw);
-  std::cout << "n_past_seconds_pos: " << n_past_seconds_pos << std::endl;
-  std::cout << "n_past_seconds_vel: " << n_past_seconds_vel << std::endl;
-  std::cout << "n_past_seconds_acc: " << n_past_seconds_acc << std::endl;
-  std::cout << "n_past_seconds_des_yaw: " << n_past_seconds_des_yaw << std::endl;
 
   double delta_t = 0.1;
   int n_past_elements_pos = std::ceil(n_past_seconds_pos / delta_t); // round up
   n_past_elements_pos += std::fmod(n_past_elements_pos + 1, 2); // make uneven
-  std::cout << "n_past_elements_pos: " << n_past_elements_pos << std::endl;
 
   int n_past_elements_vel = std::ceil(n_past_seconds_vel / delta_t); // round up
   n_past_elements_vel += std::fmod(n_past_elements_vel + 1, 2); // make uneven
-  std::cout << "n_past_elements_vel: " << n_past_elements_vel << std::endl;
 
   int n_past_elements_acc = std::ceil(n_past_seconds_acc / delta_t); // round up
   n_past_elements_acc += std::fmod(n_past_elements_acc + 1, 2); // make uneven
-  std::cout << "n_past_elements_acc: " << n_past_elements_acc << std::endl;
 
   int n_past_elements_des_vel_yaw = std::ceil(n_past_seconds_des_yaw / delta_t); // round up
   n_past_elements_des_vel_yaw += std::fmod(n_past_elements_des_vel_yaw + 1, 2); // make uneven
-  std::cout << "n_past_elements_des_vel_yaw: " << n_past_elements_des_vel_yaw << std::endl;
 
   bool limit_acc_change;
   nh_private.getParam("limit_acc_change", limit_acc_change);
-  std::cout << "limit_acc_change: " << limit_acc_change << std::endl;
-  
 
   // n_past_elements = 1;
 

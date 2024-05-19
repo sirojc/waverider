@@ -24,11 +24,11 @@
      doc="Name of the file from which to read chomp planner's params."/>
 
   <!-- Run the wavemap server -->
-  <!-- <include file="$(find wavemap_ros)/launch/wavemap_server.launch" unless="$(arg load_map_from_file)">
+  <include file="$(find wavemap_ros)/launch/wavemap_server.launch" unless="$(arg load_map_from_file)">
      <arg name="param_file" value="$(arg param_file)"/>
      <arg name="debug_mode" value="$(arg debug_mode)"/>
      <arg name="show_rviz" value="$(arg show_rviz)"/>
-  </include> -->
+  </include>
   
 
   <!-- Run the waverider server -->

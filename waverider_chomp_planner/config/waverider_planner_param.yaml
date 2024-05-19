@@ -19,4 +19,4 @@ waverider_policy:
   use_only_lowest_level: true # if true: all at highest available (leaf) resolution
 
 velocity_controller:
-  k: 0.1
+  k: 0.5
