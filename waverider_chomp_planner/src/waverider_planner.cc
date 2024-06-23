@@ -276,8 +276,11 @@ void Planner::TargetTwistCommandApproach() {
   Eigen::Vector2d velocities_x_y = getLinearTargetVelocity(accelerations_x_y);
 
   // get desired yaw velocity
-  double des_yaw_vel = std::atan2(velocities_x_y[1], velocities_x_y[0]);
-  double yaw_velocity = getTargetYawVelocity(des_yaw_vel, curr_yaw_);
+  double des_yaw = std::atan2(velocities_x_y[1], velocities_x_y[0]) + M_PI; // orient back towards goal
+  if (des_yaw > M_PI) {
+    des_yaw -= 2 * M_PI;
+  }
+  double yaw_velocity = getTargetYawVelocity(des_yaw, curr_yaw_);
 
   // get entire twist command
   geometry_msgs::TwistStamped twist_command;
