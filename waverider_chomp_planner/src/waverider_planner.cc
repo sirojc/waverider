@@ -32,6 +32,7 @@ Planner::Planner(ros::NodeHandle nh, ros::NodeHandle nh_private, double delta_t,
     pub_des_vel_ = nh_.advertise<geometry_msgs::TwistStamped>("/waverider_planner/des_vel", 10, true);
     pub_des_acc_calc_ = nh_.advertise<waverider_chomp_msgs::DesiredLinearAccelerationCalculation>("/waverider_planner/des_acc_calc", 10, true);
     pub_des_yaw_vel_calc_ = nh_.advertise<waverider_chomp_msgs::DesiredYawVelocityCalculation>("/waverider_planner/des_yaw_vel_calc", 10, true);
+    reached_pos_once_ = false;
 
     sub_twist_mux_ = nh_.subscribe("/twist_mux/twist", 1, &Planner::callbackTwistMux, this);
     pub_occupancy_ = nh.advertise<wavemap_msgs::Map>("waverider_planner/map", 10, true);
@@ -563,20 +564,24 @@ void Planner::run() {
     if (!isPositionTargetReached()) {
       TargetTwistCommandApproach();
     } else {
-      ROS_INFO_ONCE("Target position reached");
+      if (!reached_pos_once_){
+        ROS_INFO("Target position reached");
+        reached_pos_once_ = true;
+      }
       // while position reached, yaw not reached: rotate
       if (!isYawTargetReached()) {
         TargetTwistCommandFinalRotation();
       } else {
-        ROS_INFO_ONCE("Target yaw reached");
+        ROS_INFO("Target yaw reached");
         planning_ = false;
         reached_pos_ = false;
+        reached_pos_once_ = false;
 
         Goal result;
         result.success = true;
         get_path_action_srv_.setSucceeded(result);
 
-        ROS_INFO_ONCE("Planning finished successfully");
+        ROS_INFO("Planning finished successfully");
       }
     }
   }

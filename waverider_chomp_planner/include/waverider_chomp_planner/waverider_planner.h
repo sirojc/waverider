@@ -162,6 +162,8 @@ private:
   double k_vel_ctrl_;
 
   geometry_msgs::TwistStamped twist_mux_twist_; // for visualization purposes
+
+  double reached_pos_once_;
 };
 
 }  //  waverider_planner
