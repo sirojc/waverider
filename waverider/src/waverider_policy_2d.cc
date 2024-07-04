@@ -28,10 +28,10 @@ rmpcpp::PolicyValue<2> WaveriderPolicy2D::evaluateAt(const rmpcpp::State<2>& x, 
     if (i == 0 || run_all_levels_) {
         //std::cout << "N"<< i << policy_cells.centers[i].size() << std::endl;
 
-      // only use obstacle cells that are within [robot_height - radius, robot_height + radius]
+      // only use obstacle cells that are within [robot_height - 0.3, robot_height - 0.1]
       std::vector<Eigen::Vector3f> considered_centers;
       for (const auto& center : policy_cells.centers[i]) {
-        if (center.z() >= robot_height - radius && center.z() <= robot_height + radius) {
+        if (center.z() >= robot_height - 0.3 && center.z() <= robot_height - 0.1) {
           considered_centers.push_back(center);
         }
       }

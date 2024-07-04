@@ -166,8 +166,8 @@ Eigen::Vector2d Planner::getLinearTargetAcceleration() {
   // evaluate target policy
   rmpcpp::PolicyValue<2> target_result = target_policy_.evaluateAt(curr_state_);
 
-  // evaluate waverider policy
-  rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.4);
+  // evaluate waverider policy - radius unused! look up waverider_ppolicy_2d
+  rmpcpp::PolicyValue<2> waverider_result = waverider_policy_.evaluateAt(curr_state_, curr_height_, 0.0);
 
   // get target acceleration
   std::vector<rmpcpp::PolicyValue<2>> policies = {target_result, waverider_result};
